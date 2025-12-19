@@ -1,0 +1,73 @@
+/* Waste Management Benefits Section Styles */
+.waste-benefits-section {
+    padding: 100px 20px;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.waste-benefits-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.waste-benefits-header {
+    text-align: center;
+    margin-bottom: 80px;
+}
+
+.waste-benefits-title {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.waste-benefits-subtitle {
+    font-size: 1.2rem;
+    color: var(--color-text-light);
+}
+
+.waste-benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 40px;
+}
+
+.waste-benefit-card {
+    padding: 40px;
+    border-radius: 20px;
+    background-color: var(--color-bg-alt);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: default;
+}
+
+.waste-benefit-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(34, 197, 94, 0.15);
+}
+
+.waste-benefit-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    display: inline-block;
+    padding: 15px;
+    border-radius: 15px;
+}
+
+.waste-benefit-card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: var(--color-text);
+}
+
+.waste-benefit-card-text {
+    color: var(--color-text-light);
+    font-size: 1rem;
+    line-height: 1.6;
+}

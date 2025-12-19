@@ -1,0 +1,215 @@
+/* World Issues Section Styles */
+.world-issues-section {
+    padding: 120px 20px;
+    background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-alt) 100%);
+    overflow: hidden;
+}
+
+.world-issues-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Header */
+.world-issues-header {
+    text-align: center;
+    margin-bottom: 80px;
+}
+
+.section-label {
+    display: inline-block;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    color: white;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+}
+
+.world-issues-title {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--color-text);
+    line-height: 1.2;
+}
+
+.world-issues-subtitle {
+    font-size: 1.2rem;
+    color: var(--color-text-light);
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.7;
+}
+
+/* Issues Grid */
+.issues-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 60px;
+}
+
+.issue-card {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+    background: var(--color-bg);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.issue-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+.issue-card.reverse {
+    flex-direction: row-reverse;
+}
+
+/* Image */
+.issue-image-container {
+    flex: 1;
+    min-height: 300px;
+    position: relative;
+    overflow: hidden;
+}
+
+.issue-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.issue-card:hover .issue-image {
+    transform: scale(1.05);
+}
+
+.issue-image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+/* Content */
+.issue-content {
+    flex: 1;
+    padding: 40px;
+}
+
+.issue-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
+
+.issue-icon {
+    font-size: 2rem;
+}
+
+.issue-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    color: var(--color-text);
+}
+
+.issue-description {
+    font-size: 1rem;
+    color: var(--color-text-light);
+    line-height: 1.7;
+}
+
+/* Conclusion Banner */
+.conclusion-banner {
+    margin-top: 80px;
+    padding: 60px 40px;
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    border-radius: 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.conclusion-banner::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+    animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+}
+
+.conclusion-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.conclusion-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 15px;
+    position: relative;
+}
+
+.conclusion-text {
+    font-size: 1.1rem;
+    color: #9ca3af;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.7;
+    position: relative;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+
+    .issue-card,
+    .issue-card.reverse {
+        flex-direction: column;
+    }
+
+    .issue-image-container {
+        min-height: 200px;
+        width: 100%;
+    }
+
+    .world-issues-title {
+        font-size: 2.2rem;
+    }
+
+    .issue-content {
+        padding: 30px;
+    }
+}
