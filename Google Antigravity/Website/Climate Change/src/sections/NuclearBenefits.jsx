@@ -12,19 +12,19 @@ const NuclearBenefits = () => {
             icon: '🌧️',
             title: t.nuclearBenefit1Title,
             text: t.nuclearBenefit1Text,
-            color: '#0ea5e9'
+            color: '#eab308'
         },
         {
             icon: '🌍',
             title: t.nuclearBenefit2Title,
             text: t.nuclearBenefit2Text,
-            color: '#6366f1'
+            color: '#ca8a04'
         },
         {
             icon: '⚡',
             title: t.nuclearBenefit3Title,
             text: t.nuclearBenefit3Text,
-            color: '#10b981'
+            color: '#a16207'
         }
     ];
 

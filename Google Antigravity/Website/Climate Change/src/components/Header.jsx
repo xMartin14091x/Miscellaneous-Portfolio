@@ -85,6 +85,7 @@ const Header = () => {
                 <Link to="/nuclear-power" className="nav-link" onClick={closeMenu}>{t.nuclearPower}</Link>
                 <Link to="/water-filtration" className="nav-link" onClick={closeMenu}>{t.waterFiltration}</Link>
                 <Link to="/waste-management" className="nav-link" onClick={closeMenu}>{t.wasteManagement}</Link>
+                <Link to="/co-emissions" className="nav-link" onClick={closeMenu}>{t.coEmissions}</Link>
             </nav>
         </header>
     );

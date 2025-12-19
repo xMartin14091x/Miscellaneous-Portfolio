@@ -5,6 +5,7 @@ import Footer from './components/Footer';
 import NuclearPower from './pages/NuclearPower';
 import WaterFiltration from './pages/WaterFiltration';
 import WasteManagement from './pages/WasteManagement';
+import COEmissions from './pages/COEmissions';
 import Home from './pages/Home';
 import ScrollToTop from './components/ScrollToTop';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -24,6 +25,7 @@ function App() {
               <Route path="/nuclear-power" element={<NuclearPower />} />
               <Route path="/water-filtration" element={<WaterFiltration />} />
               <Route path="/waste-management" element={<WasteManagement />} />
+              <Route path="/co-emissions" element={<COEmissions />} />
             </Routes>
             <Footer />
           </div>
@@ -34,4 +36,3 @@ function App() {
 }
 
 export default App;
-

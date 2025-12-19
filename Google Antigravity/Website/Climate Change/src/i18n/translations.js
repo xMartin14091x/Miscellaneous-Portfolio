@@ -165,6 +165,35 @@ export const translations = {
 
         wasteMethod3Title: 'Education & Policy',
         wasteMethod3Desc: 'Public education, responsible consumption habits, and strong policy enforcement create lasting change. When communities understand the impact, less waste is generated overall.',
+
+        // CO Emissions Page
+        coEmissions: 'CO Emissions',
+        coHeroTitle: 'Cleaner Air Through Smarter Transportation',
+        coHeroSubtitle: 'Addressing carbon monoxide emissions from vehicles while creating integrated solutions that combine technology, urban planning, and sustainable energy systems.',
+
+        coBenefitsTitle: 'Reducing Vehicle Emissions',
+        coBenefitsSubtitle: 'Cutting CO pollution at the source through cleaner vehicles, better standards, and proper maintenance.',
+
+        coBenefit1Title: 'Electric & Hybrid Vehicles',
+        coBenefit1Text: 'Transitioning to electric and hybrid vehicles eliminates tailpipe CO emissions entirely. EVs produce zero direct carbon monoxide, dramatically improving urban air quality and reducing health risks in densely populated areas.',
+
+        coBenefit2Title: 'Emission Standards & Maintenance',
+        coBenefit2Text: 'Stricter emission standards and enforced vehicle inspections ensure catalytic converters function properly. Well-maintained engines with optimal fuel combustion prevent the incomplete burning that creates carbon monoxide.',
+
+        coBenefit3Title: 'Public Transit & Active Transport',
+        coBenefit3Text: 'Expanding reliable public transportation, encouraging walking and cycling, and optimizing traffic flow reduces the number of cars on roads. Less idling and fewer vehicles directly translates to lower CO concentrations in city air.',
+
+        coMethodsTitle: 'A Holistic Approach to Air Quality',
+        coMethodsSubtitle: 'Combining transportation solutions with environmental and energy policies creates lasting improvements in urban air quality.',
+
+        coMethod1Title: 'Clean Energy Transition',
+        coMethod1Desc: 'Shifting power generation toward renewable and nuclear energy reduces emissions from electricity production. When EVs charge from clean grids, the entire transportation system becomes emission-free.',
+
+        coMethod2Title: 'Urban Green Spaces',
+        coMethod2Desc: 'Increasing tree cover and green infrastructure naturally filters air pollutants. Strategic placement of parks and green corridors along busy roads creates natural buffers that improve local air quality.',
+
+        coMethod3Title: 'Integrated Smart Cities',
+        coMethod3Desc: 'Smart traffic management, industrial emission controls, and coordinated urban planning ensure transportation, energy, and environmental systems work together to create healthier, more breathable cities.',
     },
     th: {
         // Header
@@ -332,6 +361,35 @@ export const translations = {
 
         wasteMethod3Title: 'การศึกษาและนโยบาย',
         wasteMethod3Desc: 'การศึกษาสาธารณะ นิสัยการบริโภคอย่างรับผิดชอบ และการบังคับใช้นโยบายที่เข้มแข็งสร้างการเปลี่ยนแปลงที่ยั่งยืน',
+
+        // CO Emissions Page
+        coEmissions: 'การปล่อย CO',
+        coHeroTitle: 'อากาศสะอาดผ่านการขนส่งอัจฉริยะ',
+        coHeroSubtitle: 'แก้ไขปัญหาการปล่อยก๊าซคาร์บอนมอนอกไซด์จากยานพาหนะ พร้อมสร้างโซลูชันแบบบูรณาการที่ผสมผสานเทคโนโลยี ผังเมือง และระบบพลังงานที่ยั่งยืน',
+
+        coBenefitsTitle: 'การลดการปล่อยมลพิษจากยานพาหนะ',
+        coBenefitsSubtitle: 'ลดมลพิษ CO ที่ต้นทางผ่านยานพาหนะที่สะอาดกว่า มาตรฐานที่ดีกว่า และการบำรุงรักษาที่เหมาะสม',
+
+        coBenefit1Title: 'ยานยนต์ไฟฟ้าและไฮบริด',
+        coBenefit1Text: 'การเปลี่ยนมาใช้ยานยนต์ไฟฟ้าและไฮบริดขจัดการปล่อย CO จากท่อไอเสียได้ทั้งหมด รถ EV ไม่ปล่อยคาร์บอนมอนอกไซด์โดยตรง ปรับปรุงคุณภาพอากาศในเมืองอย่างมากและลดความเสี่ยงด้านสุขภาพ',
+
+        coBenefit2Title: 'มาตรฐานการปล่อยมลพิษและการบำรุงรักษา',
+        coBenefit2Text: 'มาตรฐานการปล่อยมลพิษที่เข้มงวดและการตรวจสอบยานพาหนะบังคับทำให้ตัวเร่งปฏิกิริยาทำงานได้อย่างถูกต้อง เครื่องยนต์ที่ได้รับการบำรุงรักษาดีป้องกันการเผาไหม้ไม่สมบูรณ์ที่สร้างคาร์บอนมอนอกไซด์',
+
+        coBenefit3Title: 'ขนส่งสาธารณะและการเดินทางเชิงรุก',
+        coBenefit3Text: 'การขยายระบบขนส่งสาธารณะที่เชื่อถือได้ ส่งเสริมการเดินและการปั่นจักรยาน และเพิ่มประสิทธิภาพการไหลของจราจรลดจำนวนรถบนถนน การจอดเครื่องยนต์และรถน้อยลงแปลเป็นความเข้มข้นของ CO ต่ำลงโดยตรง',
+
+        coMethodsTitle: 'แนวทางแบบองค์รวมสำหรับคุณภาพอากาศ',
+        coMethodsSubtitle: 'การผสมผสานโซลูชันการขนส่งกับนโยบายสิ่งแวดล้อมและพลังงานสร้างการปรับปรุงคุณภาพอากาศในเมืองอย่างยั่งยืน',
+
+        coMethod1Title: 'การเปลี่ยนผ่านสู่พลังงานสะอาด',
+        coMethod1Desc: 'การเปลี่ยนการผลิตไฟฟ้าไปสู่พลังงานหมุนเวียนและนิวเคลียร์ลดการปล่อยมลพิษจากการผลิตไฟฟ้า เมื่อ EV ชาร์จจากกริดสะอาด ระบบขนส่งทั้งหมดจะปราศจากการปล่อยมลพิษ',
+
+        coMethod2Title: 'พื้นที่สีเขียวในเมือง',
+        coMethod2Desc: 'การเพิ่มต้นไม้และโครงสร้างพื้นฐานสีเขียวกรองมลพิษทางอากาศตามธรรมชาติ การวางสวนสาธารณะและทางเดินสีเขียวตามถนนที่พลุกพล่านสร้างกันชนธรรมชาติที่ปรับปรุงคุณภาพอากาศท้องถิ่น',
+
+        coMethod3Title: 'เมืองอัจฉริยะแบบบูรณาการ',
+        coMethod3Desc: 'การจัดการจราจรอัจฉริยะ การควบคุมการปล่อยมลพิษจากอุตสาหกรรม และการวางผังเมืองอย่างประสานงานทำให้ระบบขนส่ง พลังงาน และสิ่งแวดล้อมทำงานร่วมกันเพื่อสร้างเมืองที่สุขภาพดีกว่า',
     }
 };
 

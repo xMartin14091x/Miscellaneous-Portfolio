@@ -1,22 +1,22 @@
-/* Nuclear Methods Section Styles */
-.nuclear-methods-section {
+/* CO Emissions Methods Section Styles */
+.co-methods-section {
     padding: 100px 20px;
     background: linear-gradient(180deg, var(--color-bg-alt) 0%, var(--color-bg) 100%);
     color: var(--color-text);
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.nuclear-methods-container {
+.co-methods-container {
     max-width: 1200px;
     margin: 0 auto;
 }
 
-.nuclear-methods-header {
+.co-methods-header {
     text-align: center;
     margin-bottom: 80px;
 }
 
-.nuclear-methods-title {
+.co-methods-title {
     font-size: 3rem;
     font-weight: 700;
     margin-bottom: 20px;
@@ -26,7 +26,7 @@
     background-clip: text;
 }
 
-.nuclear-methods-subtitle {
+.co-methods-subtitle {
     font-size: 1.2rem;
     color: var(--color-text-light);
     max-width: 700px;
@@ -34,68 +34,68 @@
     line-height: 1.6;
 }
 
-.nuclear-methods-grid {
+.co-methods-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 30px;
 }
 
-.nuclear-method-card {
+.co-method-card {
     padding: 40px;
     border-radius: 20px;
     background-color: var(--color-bg);
-    border: 1px solid rgba(14, 165, 233, 0.15);
+    border: 1px solid rgba(100, 116, 139, 0.15);
     position: relative;
     overflow: hidden;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.nuclear-method-card::before {
+.co-method-card::before {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+    background: linear-gradient(135deg, #64748b 0%, #475569 100%);
 }
 
-.nuclear-method-card:hover {
+.co-method-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 20px 40px rgba(14, 165, 233, 0.1);
+    box-shadow: 0 20px 40px rgba(100, 116, 139, 0.1);
 }
 
-.nuclear-method-number {
+.co-method-number {
     font-size: 4rem;
     font-weight: 800;
-    color: rgba(14, 165, 233, 0.1);
+    color: rgba(100, 116, 139, 0.1);
     position: absolute;
     top: 20px;
     right: 30px;
     line-height: 1;
 }
 
-.nuclear-method-icon {
+.co-method-icon {
     font-size: 2.5rem;
     display: block;
     margin-bottom: 20px;
 }
 
-.nuclear-method-title {
+.co-method-title {
     font-size: 1.4rem;
     font-weight: 600;
     margin-bottom: 15px;
     color: var(--color-text);
 }
 
-.nuclear-method-desc {
+.co-method-desc {
     color: var(--color-text-light);
     font-size: 1rem;
     line-height: 1.7;
 }
 
 @media (max-width: 768px) {
-    .nuclear-methods-title {
+    .co-methods-title {
         font-size: 2rem;
     }
 }
