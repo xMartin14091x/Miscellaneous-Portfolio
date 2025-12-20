@@ -1,0 +1,220 @@
+/* ============================================
+   InvestMan! Global Styles
+   ============================================
+   This file contains global styles, CSS variables,
+   typography, and utility classes used throughout
+   the application.
+   ============================================ */
+
+/* --- Google Fonts Import --- */
+/* Kanit: Used for all text (both EN and TH) */
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800;900&display=swap');
+
+/* ============================================
+   CSS CUSTOM PROPERTIES
+   ============================================ */
+
+/* --- Light Theme (Default) --- */
+:root {
+  /* Primary Green Palette - Main brand colors */
+  --primary-color: #10b981;
+  /* Main green */
+  --primary-light: #34d399;
+  /* Lighter green for accents */
+  --primary-dark: #059669;
+  /* Darker green for hover states */
+  --primary-glow: rgba(16, 185, 129, 0.15);
+  /* Subtle glow effect */
+  --hero-glow: rgba(16, 185, 129, 0.4);
+  /* Hero section glow */
+  --accent-color: #6ee7b7;
+  /* Accent highlights */
+
+  /* Background Colors */
+  --bg-color: #ffffff;
+  /* Main page background */
+  --section-alt-bg: #f0fdf4;
+  /* Alternate section background */
+  --card-bg: #ffffff;
+  /* Card/modal background */
+  --navbar-bg: rgba(255, 255, 255, 0.9);
+  /* Navbar with blur */
+  --footer-bg: #f8fafc;
+  /* Footer background */
+
+  /* Text Colors */
+  --text-color: #1f2937;
+  /* Primary text (dark gray) */
+  --text-secondary: #4b5563;
+  /* Secondary/muted text */
+
+  /* UI Element Colors */
+  --border-color: rgba(0, 0, 0, 0.08);
+  /* Borders and dividers */
+  --button-bg: #f3f4f6;
+  /* Button background */
+  --button-text: #374151;
+  /* Button text color */
+
+  /* Gradients */
+  --hero-gradient: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Dark Theme --- */
+/* Applied when data-theme="dark" is set on <html> */
+[data-theme="dark"] {
+  --bg-color: #0f172a;
+  /* Dark blue-gray background */
+  --section-alt-bg: #0f172a;
+  /* Same as main for consistency */
+  --card-bg: #1e293b;
+  /* Lighter card background */
+  --navbar-bg: rgba(15, 23, 42, 0.95);
+  --footer-bg: #0a0f1a;
+  /* Darker footer */
+
+  --text-color: #f1f5f9;
+  /* Light text */
+  --text-secondary: #94a3b8;
+  /* Muted light text */
+
+  --border-color: rgba(255, 255, 255, 0.1);
+  --button-bg: #334155;
+  --button-text: #e2e8f0;
+
+  --hero-gradient: linear-gradient(180deg, #0f172a 0%, #0f172a 100%);
+  --primary-glow: rgba(16, 185, 129, 0.15);
+  --hero-glow: rgba(16, 185, 129, 0.5);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+/* --- Reset --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* --- Smooth Scrolling --- */
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+/* --- Body Base Styles --- */
+/* Using Kanit for all languages */
+body {
+  font-family: 'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+
+/* --- Headings --- */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* --- Links --- */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* --- Buttons --- */
+button {
+  font-family: inherit;
+}
+
+/* --- Text Selection --- */
+::selection {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--section-alt-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dark);
+}
+
+/* ============================================
+   FOCUS STATES
+   For keyboard accessibility
+   ============================================ */
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* --- Container --- */
+/* Centered content with max-width */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* ============================================
+   RESPONSIVE TYPOGRAPHY
+   Base font size adjustments for mobile
+   ============================================ */
+
+html {
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+}
