@@ -16,9 +16,8 @@ const PlanningPage = () => {
         addInvestment,
         removeInvestment,
         updateInvestment,
-        plans,
-        loadPlan,
-        deletePlan,
+        isLoading,
+        isSyncing,
         getInvestmentCostBreakdown,
         isInvestmentOverspent,
         generateDcaSchedule,
@@ -27,7 +26,6 @@ const PlanningPage = () => {
     } = useInvestment();
 
     // UI State
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [showAccountModal, setShowAccountModal] = useState(false);
     const [showInvestmentModal, setShowInvestmentModal] = useState(false);
     const [editingAccount, setEditingAccount] = useState(null);
@@ -222,68 +220,30 @@ const PlanningPage = () => {
         }).join(' + ');
     };
 
+    // Show loading state
+    if (isLoading) {
+        return (
+            <div className="planning-page">
+                <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <p>Loading your data...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="planning-page">
-            {/* Main Layout */}
-            <div className={`planning-layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+            {/* Sync indicator */}
+            {isSyncing && (
+                <div className="sync-indicator">
+                    <div className="sync-spinner"></div>
+                    Saving...
+                </div>
+            )}
 
-                {/* Left Sidebar - Saved Plans (Sticky) */}
-                <aside className={`planning-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-                    <div className="sidebar-header">
-                        <h3>{t.savedPlans}</h3>
-                        <button
-                            className="sidebar-toggle"
-                            onClick={() => setSidebarOpen(!sidebarOpen)}
-                            title="Toggle sidebar"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="15 18 9 12 15 6"></polyline>
-                            </svg>
-                        </button>
-                    </div>
-                    <div className="sidebar-content">
-                        {plans.length === 0 ? (
-                            <p className="no-plans">{t.noPlansSaved}</p>
-                        ) : (
-                            <ul className="plans-list">
-                                {plans.map(plan => (
-                                    <li key={plan.id} className="plan-item">
-                                        <button
-                                            className="plan-name"
-                                            onClick={() => loadPlan(plan.id)}
-                                        >
-                                            {plan.name}
-                                        </button>
-                                        <button
-                                            className="plan-delete"
-                                            onClick={() => deletePlan(plan.id)}
-                                            title={t.delete}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                                            </svg>
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                </aside>
-
-                {/* Collapsed Sidebar Toggle */}
-                {!sidebarOpen && (
-                    <button
-                        className="sidebar-expand-btn"
-                        onClick={() => setSidebarOpen(true)}
-                        title="Open sidebar"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                    </button>
-                )}
-
+            {/* Main Layout - no sidebar needed, data auto-saves */}
+            <div className="planning-layout sidebar-closed">
                 {/* Main Content Area */}
                 <main className="planning-main">
                     {/* Exchange Rate Button - Top Right (Sticky) */}
