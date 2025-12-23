@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useInvestment } from '../context/InvestmentContext';
 import './PlanningPage.css';
@@ -145,23 +145,6 @@ const PlanningPage = () => {
         setColorHue(hue);
         const rgb = hsvToRgb(hue, 1, 1);
         setGroupForm(prev => ({ ...prev, color: rgb }));
-    };
-
-    // Close all menus when clicking outside
-    const handleOutsideClick = (e) => {
-        // Don't close if clicking on a menu button or inside a menu
-        if (e.target.closest('.menu-btn') ||
-            e.target.closest('.dropdown-menu') ||
-            e.target.closest('.fab-button') ||
-            e.target.closest('.fab-container') ||
-            e.target.closest('.plan-menu-btn') ||
-            e.target.closest('.add-plan-btn') ||
-            e.target.closest('.add-plan-menu')) {
-            return;
-        }
-        setActiveMenu(null);
-        setFabOpen(false);
-        setAddPlanMenuOpen(false);
     };
 
     // Format date as DD/Month/YYYY
@@ -570,6 +553,9 @@ const PlanningPage = () => {
                     </span>
                     <button
                         className="menu-btn"
+                        draggable="false"
+                        onDragStart={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === `grp-${group.id}` ? null : `grp-${group.id}`); }}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -578,25 +564,27 @@ const PlanningPage = () => {
                             <circle cx="12" cy="19" r="2"></circle>
                         </svg>
                     </button>
-                    {activeMenu === `grp-${group.id}` && (
-                        <div className="dropdown-menu">
-                            <button onClick={() => openEditGroup(group)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                </svg>
-                                {t.editGroup}
-                            </button>
-                            <button onClick={() => { removeGroup(group.id); setActiveMenu(null); }} className="delete-option">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                </svg>
-                                {t.deleteGroup}
-                            </button>
-                        </div>
-                    )}
                 </div>
+
+                {/* Group dropdown - OUTSIDE group-header to prevent hover conflicts */}
+                {activeMenu === `grp-${group.id}` && (
+                    <div className="dropdown-menu group-dropdown" style={{ position: 'absolute', top: '3rem', right: '0.5rem', zIndex: 9999 }}>
+                        <button onClick={() => openEditGroup(group)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                            {t.editGroup}
+                        </button>
+                        <button onClick={() => { removeGroup(group.id); setActiveMenu(null); }} className="delete-option">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            {t.deleteGroup}
+                        </button>
+                    </div>
+                )}
 
                 {isExpanded && (
                     <div className="group-content">
@@ -692,10 +680,7 @@ const PlanningPage = () => {
             )}
 
             {/* Main Layout with Sidebar */}
-            <div
-                className={`planning-layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
-                onClick={handleOutsideClick}
-            >
+            <div className={`planning-layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
 
                 {/* Sidebar */}
                 <aside className={`planning-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>

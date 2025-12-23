@@ -19,6 +19,26 @@ A comprehensive investment planning web application with Firebase authentication
 - 📱 **Responsive Design** - Works on desktop and mobile
 - 🌙 **Dark/Light Theme** - User preference saved
 - 🌐 **Bilingual** - English and Thai (ภาษาไทย)
+- 📁 **Investment Groups** - Organize investments with colored groups and nested subgroups
+- 🎨 **Visual Color Picker** - HSV gradient picker for group colors
+- 🔄 **Drag & Drop Reordering** - Reorder plans, accounts, groups, and investments
+- 📋 **Multiple Plans** - Create and switch between different investment plans
+
+---
+
+## 📋 Changelog
+
+### v1.2.0 (December 23, 2024)
+**Bug Fixes:**
+- Fixed group dropdown menu blinking when overlapping other groups
+- Fixed 3-dots menu button not responding to clicks on group headers
+- Fixed dropdown positioning (now properly appears below button)
+
+**New Features:**
+- Added `Fixed issues/` folder with bug documentation
+- Visual HSV color picker for group customization
+- Drag-and-drop reordering for all list elements
+- Slide animations for group expand/collapse
 
 ---
 

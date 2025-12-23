@@ -562,6 +562,7 @@
     border-left: 3px solid var(--primary-color);
     border-radius: 8px;
     overflow: visible;
+    position: relative;
 }
 
 .group-header {
@@ -626,7 +627,7 @@
     top: 100%;
     right: 0.5rem;
     margin-top: 0.25rem;
-    z-index: 150;
+    z-index: 9999;
 }
 
 .group-content {

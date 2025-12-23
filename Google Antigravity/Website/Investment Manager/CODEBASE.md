@@ -12,6 +12,9 @@ InvestMan! helps investors:
 3. **Schedule DCA (Dollar Cost Averaging)** with date tracking and completion checkboxes
 4. **Sync data across devices** via Firebase Firestore (auto-save, real-time)
 5. **Authenticate** via Email/Password, Phone OTP, or Google Sign-In
+6. **Organize with groups** - Create colored investment groups with nested subgroups
+7. **Multiple plans** - Create and switch between different investment strategies
+8. **Drag-and-drop** - Reorder plans, accounts, groups, and investments
 
 ---
 
