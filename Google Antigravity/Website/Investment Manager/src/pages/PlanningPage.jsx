@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useInvestment } from '../context/InvestmentContext';
 import './PlanningPage.css';
@@ -6,6 +6,19 @@ import './PlanningPage.css';
 const PlanningPage = () => {
     const { t } = useLanguage();
     const {
+        // Plans
+        plans,
+        currentPlanId,
+        createPlan,
+        renamePlan,
+        deletePlan,
+        switchPlan,
+        exportPlanCSV,
+        exportPlanTXT,
+        importPlan,
+        sidebarOpen,
+        toggleSidebar,
+        // Data
         exchangeRate,
         setExchangeRate,
         accounts,
@@ -16,24 +29,54 @@ const PlanningPage = () => {
         addInvestment,
         removeInvestment,
         updateInvestment,
+        // Groups
+        groups,
+        addGroup,
+        updateGroup,
+        removeGroup,
+        moveInvestmentToGroup,
+        getGroupFundAmount,
+        getRootGroups,
+        getChildGroups,
+        getGroupInvestments,
+        getUngroupedInvestments,
+        // Util
         isLoading,
         isSyncing,
         getInvestmentCostBreakdown,
         isInvestmentOverspent,
         generateDcaSchedule,
         toggleDcaCompletion,
-        getDcaCompletionCount
+        getDcaCompletionCount,
+        // Reorder
+        reorderPlans,
+        reorderGroups,
+        reorderInvestments,
+        reorderAccounts
     } = useInvestment();
 
     // UI State
     const [showAccountModal, setShowAccountModal] = useState(false);
     const [showInvestmentModal, setShowInvestmentModal] = useState(false);
+    const [showGroupModal, setShowGroupModal] = useState(false);
     const [editingAccount, setEditingAccount] = useState(null);
     const [editingInvestment, setEditingInvestment] = useState(null);
+    const [editingGroup, setEditingGroup] = useState(null);
     const [isEditingRate, setIsEditingRate] = useState(false);
     const [tempRate, setTempRate] = useState(exchangeRate);
     const [expandedInvestment, setExpandedInvestment] = useState(null);
+    const [expandedGroups, setExpandedGroups] = useState({});
     const [activeMenu, setActiveMenu] = useState(null);
+    const [fabOpen, setFabOpen] = useState(false);
+    const [addPlanMenuOpen, setAddPlanMenuOpen] = useState(false);
+    const [renamingPlanId, setRenamingPlanId] = useState(null);
+    const [renamePlanValue, setRenamePlanValue] = useState('');
+    const fileInputRef = useRef(null);
+
+    // Drag reorder state
+    const [dragItem, setDragItem] = useState(null);
+    const [dragOverItem, setDragOverItem] = useState(null);
+    const dragType = useRef(null);
 
     // Account Form State
     const [accountForm, setAccountForm] = useState({
@@ -50,9 +93,76 @@ const PlanningPage = () => {
         dcaType: 'monthly',
         customDcaValue: 1,
         customDcaUnit: 'months',
-        dcaStartDate: '',
+        dcaStartDate: new Date().toISOString().split('T')[0],
         dcaEndDate: ''
     });
+
+    // Group Form State
+    const [groupForm, setGroupForm] = useState({
+        name: '',
+        color: { r: 34, g: 197, b: 94 },
+        percentage: 100,
+        parentGroupId: null
+    });
+    const [colorHue, setColorHue] = useState(145); // Default green hue
+    const colorPickerRef = useRef(null);
+
+    // HSV to RGB conversion
+    const hsvToRgb = (h, s, v) => {
+        const c = v * s;
+        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        const m = v - c;
+        let r, g, b;
+        if (h < 60) { r = c; g = x; b = 0; }
+        else if (h < 120) { r = x; g = c; b = 0; }
+        else if (h < 180) { r = 0; g = c; b = x; }
+        else if (h < 240) { r = 0; g = x; b = c; }
+        else if (h < 300) { r = x; g = 0; b = c; }
+        else { r = c; g = 0; b = x; }
+        return {
+            r: Math.round((r + m) * 255),
+            g: Math.round((g + m) * 255),
+            b: Math.round((b + m) * 255)
+        };
+    };
+
+    // Handle color picker click
+    const handleColorPickerClick = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        const saturation = x;
+        const brightness = 1 - y;
+        const rgb = hsvToRgb(colorHue, saturation, brightness);
+        setGroupForm(prev => ({ ...prev, color: rgb }));
+    };
+
+    // Handle hue bar click
+    const handleHueClick = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const hue = x * 360;
+        setColorHue(hue);
+        const rgb = hsvToRgb(hue, 1, 1);
+        setGroupForm(prev => ({ ...prev, color: rgb }));
+    };
+
+    // Close all menus when clicking outside
+    const handleOutsideClick = (e) => {
+        // Don't close if clicking on a menu button or inside a menu
+        if (e.target.closest('.menu-btn') ||
+            e.target.closest('.dropdown-menu') ||
+            e.target.closest('.fab-button') ||
+            e.target.closest('.fab-container') ||
+            e.target.closest('.plan-menu-btn') ||
+            e.target.closest('.add-plan-btn') ||
+            e.target.closest('.add-plan-menu')) {
+            return;
+        }
+        setActiveMenu(null);
+        setFabOpen(false);
+        setAddPlanMenuOpen(false);
+    };
 
     // Format date as DD/Month/YYYY
     const formatDate = (date) => {
@@ -160,11 +270,93 @@ const PlanningPage = () => {
             dcaType: 'monthly',
             customDcaValue: 1,
             customDcaUnit: 'months',
-            dcaStartDate: '',
+            dcaStartDate: new Date().toISOString().split('T')[0],
             dcaEndDate: ''
         });
         setShowInvestmentModal(false);
         setEditingInvestment(null);
+    };
+
+    // Group Handlers
+    const handleGroupSubmit = (e) => {
+        e.preventDefault();
+        if (groupForm.name.trim()) {
+            if (editingGroup) {
+                updateGroup(editingGroup.id, groupForm);
+            } else {
+                addGroup(groupForm);
+            }
+            resetGroupForm();
+        }
+    };
+
+    const resetGroupForm = () => {
+        setGroupForm({
+            name: '',
+            color: { r: 34, g: 197, b: 94 },
+            percentage: 100,
+            parentGroupId: null
+        });
+        setShowGroupModal(false);
+        setEditingGroup(null);
+    };
+
+    const openEditGroup = (group) => {
+        setEditingGroup(group);
+        setGroupForm({
+            name: group.name,
+            color: group.color || { r: 34, g: 197, b: 94 },
+            percentage: group.percentage || 100,
+            parentGroupId: group.parentGroupId || null
+        });
+        setShowGroupModal(true);
+        setActiveMenu(null);
+    };
+
+    const toggleGroupExpand = (groupId) => {
+        setExpandedGroups(prev => ({
+            ...prev,
+            [groupId]: !prev[groupId]
+        }));
+    };
+
+    // Drag handlers for reordering
+    const handleDragStart = (e, index, type, parentId = null) => {
+        dragType.current = { type, parentId };
+        setDragItem(index);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        if (dragOverItem !== index) {
+            setDragOverItem(index);
+        }
+    };
+
+    const handleDragEnd = () => {
+        if (dragItem !== null && dragOverItem !== null && dragItem !== dragOverItem) {
+            const { type, parentId } = dragType.current || {};
+
+            switch (type) {
+                case 'plan':
+                    reorderPlans(dragItem, dragOverItem);
+                    break;
+                case 'group':
+                    reorderGroups(parentId, dragItem, dragOverItem);
+                    break;
+                case 'investment':
+                    reorderInvestments(parentId, dragItem, dragOverItem);
+                    break;
+                case 'account':
+                    reorderAccounts(dragItem, dragOverItem);
+                    break;
+            }
+        }
+
+        setDragItem(null);
+        setDragOverItem(null);
+        dragType.current = null;
     };
 
     // Toggle account in priority list
@@ -204,7 +396,7 @@ const PlanningPage = () => {
         }).join(' + ');
     };
 
-    // Get per-DCA amount display (total cost / number of DCAs)
+    // Get per-DCA amount display
     const getPerDcaDisplay = (investmentId) => {
         const dcaCount = getDcaCompletionCount(investmentId);
         if (dcaCount.total === 0) return null;
@@ -212,12 +404,260 @@ const PlanningPage = () => {
         const breakdown = getInvestmentCostBreakdown(investmentId);
         if (breakdown.length === 0) return null;
 
-        // Divide each account's cost by total DCA periods
         return breakdown.map(b => {
             const perDcaAmount = b.amount / dcaCount.total;
             const symbol = b.currency === 'THB' ? '฿' : '$';
             return `${symbol}${perDcaAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }).join(' + ');
+    };
+
+    // Render a single investment card
+    const renderInvestmentCard = (investment, groupColor = null, index = 0, groupId = null) => {
+        const dcaCount = getDcaCompletionCount(investment.id);
+        const schedule = generateDcaSchedule(investment);
+        const glowColor = groupColor || { r: 34, g: 197, b: 94 }; // Default green for ungrouped
+
+        return (
+            <div
+                key={investment.id}
+                className={`card investment-card ${expandedInvestment === investment.id ? 'expanded' : ''} ${isInvestmentOverspent(investment.id) ? 'overspent' : ''} ${dragItem === index && dragType.current?.type === 'investment' && dragType.current?.parentId === groupId ? 'dragging' : ''} ${dragOverItem === index && dragType.current?.type === 'investment' && dragType.current?.parentId === groupId ? 'drag-over' : ''}`}
+                style={{
+                    '--card-glow-color': `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.25)`,
+                    '--card-glow-color-subtle': `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.15)`
+                }}
+                draggable
+                onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, index, 'investment', groupId); }}
+                onDragOver={(e) => { e.stopPropagation(); handleDragOver(e, index); }}
+                onDragEnd={(e) => { e.stopPropagation(); handleDragEnd(); }}
+            >
+                {/* Row 1: Name + Percentage + 3-dot menu */}
+                <div className="investment-header">
+                    <span className="investment-name">{investment.name}</span>
+                    <span className="investment-percentage">{investment.percentage}%</span>
+                    <button
+                        className="menu-btn visible"
+                        onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === `inv-${investment.id}` ? null : `inv-${investment.id}`); }}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="5" r="2"></circle>
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <circle cx="12" cy="19" r="2"></circle>
+                        </svg>
+                    </button>
+                    {activeMenu === `inv-${investment.id}` && (
+                        <div className="dropdown-menu">
+                            <button onClick={() => openEditInvestment(investment)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                {t.edit}
+                            </button>
+                            {/* Move to group submenu */}
+                            {groups.length > 0 && (
+                                <div className="dropdown-submenu">
+                                    <span className="submenu-label">{t.moveToGroup}</span>
+                                    <button onClick={() => { moveInvestmentToGroup(investment.id, null); setActiveMenu(null); }}>
+                                        {t.ungrouped}
+                                    </button>
+                                    {groups.map(g => (
+                                        <button key={g.id} onClick={() => { moveInvestmentToGroup(investment.id, g.id); setActiveMenu(null); }}>
+                                            <span className="group-color-dot" style={{ backgroundColor: `rgb(${g.color?.r || 34}, ${g.color?.g || 197}, ${g.color?.b || 94})` }}></span>
+                                            {g.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            <button onClick={() => { removeInvestment(investment.id); setActiveMenu(null); }} className="delete-option">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                {t.delete}
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Row 2: Cost */}
+                <div className="investment-cost-row">
+                    <span className={`investment-cost ${isInvestmentOverspent(investment.id) ? 'overspent-text' : ''}`}>
+                        {getCostDisplay(investment.id)}
+                    </span>
+                </div>
+
+                {/* Row 3: DCA Type + Timeframe + Per DCA Cost */}
+                <div className="investment-dca-row" onClick={() => setExpandedInvestment(expandedInvestment === investment.id ? null : investment.id)}>
+                    <span className="dca-type-badge">{getDcaDisplay(investment)}</span>
+                    {dcaCount.total > 0 && (
+                        <div className="dca-info-group">
+                            <span className="dca-count-display">
+                                {dcaCount.completed}/{dcaCount.total}
+                                {investment.dcaEndDate && ` → ${formatDate(investment.dcaEndDate)}`}
+                            </span>
+                            {investment.dcaEndDate && (
+                                <span className="dca-per-cost">
+                                    {getPerDcaDisplay(investment.id)}/DCA
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Expanded DCA Schedule */}
+                {expandedInvestment === investment.id && schedule.length > 0 && (
+                    <div className="dca-schedule-panel">
+                        <div className="dca-dates-list">
+                            {schedule.map((item, index) => (
+                                <button
+                                    key={index}
+                                    className={`dca-date-item ${item.completed ? 'completed' : ''}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleDcaCompletion(investment.id, item.date);
+                                    }}
+                                >
+                                    <span className="dca-checkbox">{item.completed ? '✓' : ''}</span>
+                                    <span className="dca-date">{formatDate(item.date)}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // Render a group with its investments and child groups (recursive)
+    const renderGroup = (group, depth = 0, index = 0, parentGroupId = null) => {
+        const isExpanded = expandedGroups[group.id] !== false; // Default expanded
+        const childGroups = getChildGroups(group.id);
+        const groupInvestments = getGroupInvestments(group.id);
+        const groupColor = group.color || { r: 34, g: 197, b: 94 };
+        const fundAmount = getGroupFundAmount(group.id);
+        const dragKey = `group-${parentGroupId || 'root'}`;
+
+        return (
+            <div
+                key={group.id}
+                className={`investment-group ${dragItem === index && dragType.current?.type === 'group' && dragType.current?.parentId === parentGroupId ? 'dragging' : ''} ${dragOverItem === index && dragType.current?.type === 'group' && dragType.current?.parentId === parentGroupId ? 'drag-over' : ''}`}
+                style={{
+                    marginLeft: depth > 0 ? '1.5rem' : 0,
+                    borderLeftColor: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})`
+                }}
+            >
+                <div
+                    className="group-header"
+                    onClick={() => toggleGroupExpand(group.id)}
+                    style={{ backgroundColor: `rgba(${groupColor.r}, ${groupColor.g}, ${groupColor.b}, 0.1)` }}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index, 'group', parentGroupId)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                >
+                    <span className="group-expand-icon">{isExpanded ? '▼' : '▶'}</span>
+                    <span
+                        className="group-color-indicator"
+                        style={{ backgroundColor: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` }}
+                    ></span>
+                    <span className="group-name">{group.name}</span>
+                    <span className="group-percentage">{group.percentage}%</span>
+                    <span className="group-fund">
+                        ฿{fundAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        <span className="group-fund-usd">
+                            ${(fundAmount / exchangeRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </span>
+                    </span>
+                    <button
+                        className="menu-btn"
+                        onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === `grp-${group.id}` ? null : `grp-${group.id}`); }}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="5" r="2"></circle>
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <circle cx="12" cy="19" r="2"></circle>
+                        </svg>
+                    </button>
+                    {activeMenu === `grp-${group.id}` && (
+                        <div className="dropdown-menu">
+                            <button onClick={() => openEditGroup(group)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                {t.editGroup}
+                            </button>
+                            <button onClick={() => { removeGroup(group.id); setActiveMenu(null); }} className="delete-option">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                {t.deleteGroup}
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {isExpanded && (
+                    <div className="group-content">
+                        {/* Investments in this group */}
+                        {groupInvestments.length > 0 && (
+                            <div
+                                className="cards-grid investments-grid"
+                                onDragStart={(e) => e.stopPropagation()}
+                                onDragOver={(e) => e.stopPropagation()}
+                                onDragEnd={(e) => e.stopPropagation()}
+                            >
+                                {groupInvestments.map((inv, idx) => renderInvestmentCard(inv, groupColor, idx, group.id))}
+                            </div>
+                        )}
+
+                        {/* Child groups (recursive) */}
+                        {childGroups.map((child, idx) => renderGroup(child, depth + 1, idx, group.id))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // Plan management handlers
+    const handleCreatePlan = async () => {
+        await createPlan(t.untitledPlan);
+        setAddPlanMenuOpen(false);
+    };
+
+    const handleImportPlan = () => {
+        fileInputRef.current?.click();
+        setAddPlanMenuOpen(false);
+    };
+
+    const handleFileImport = async (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            await importPlan(file);
+            e.target.value = '';
+        }
+    };
+
+    const handleStartRename = (plan) => {
+        setRenamingPlanId(plan.id);
+        setRenamePlanValue(plan.name);
+        setActiveMenu(null);
+    };
+
+    const handleRenameSubmit = async () => {
+        if (renamePlanValue.trim() && renamingPlanId) {
+            await renamePlan(renamingPlanId, renamePlanValue.trim());
+        }
+        setRenamingPlanId(null);
+        setRenamePlanValue('');
+    };
+
+    const handleDeletePlan = async (planId) => {
+        if (window.confirm(t.confirmDeletePlan)) {
+            await deletePlan(planId);
+        }
+        setActiveMenu(null);
     };
 
     // Show loading state
@@ -234,6 +674,15 @@ const PlanningPage = () => {
 
     return (
         <div className="planning-page">
+            {/* Hidden file input for import */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileImport}
+                accept=".csv,.txt"
+                style={{ display: 'none' }}
+            />
+
             {/* Sync indicator */}
             {isSyncing && (
                 <div className="sync-indicator">
@@ -242,8 +691,112 @@ const PlanningPage = () => {
                 </div>
             )}
 
-            {/* Main Layout - no sidebar needed, data auto-saves */}
-            <div className="planning-layout sidebar-closed">
+            {/* Main Layout with Sidebar */}
+            <div
+                className={`planning-layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
+                onClick={handleOutsideClick}
+            >
+
+                {/* Sidebar */}
+                <aside className={`planning-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+                    <div className="sidebar-content">
+                        <h3 className="sidebar-title">{t.plans}</h3>
+
+                        {/* Plans List */}
+                        <div className="plans-list">
+                            {plans.length === 0 ? (
+                                <p className="no-plans">{t.noPlansYet}</p>
+                            ) : (
+                                plans.map((plan, index) => (
+                                    <div
+                                        key={plan.id}
+                                        className={`plan-item ${currentPlanId === plan.id ? 'active' : ''} ${dragItem === index && dragType.current?.type === 'plan' ? 'dragging' : ''} ${dragOverItem === index && dragType.current?.type === 'plan' ? 'drag-over' : ''}`}
+                                        onClick={() => switchPlan(plan.id)}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, index, 'plan')}
+                                        onDragOver={(e) => handleDragOver(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                    >
+                                        {renamingPlanId === plan.id ? (
+                                            <input
+                                                type="text"
+                                                value={renamePlanValue}
+                                                onChange={(e) => setRenamePlanValue(e.target.value)}
+                                                onBlur={handleRenameSubmit}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="plan-rename-input"
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <>
+                                                <span className="plan-icon">📁</span>
+                                                <span className="plan-name">{plan.name}</span>
+                                            </>
+                                        )}
+                                        <button
+                                            className="plan-menu-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveMenu(activeMenu === `plan-${plan.id}` ? null : `plan-${plan.id}`);
+                                            }}
+                                        >
+                                            ⋮
+                                        </button>
+                                        {activeMenu === `plan-${plan.id}` && (
+                                            <div className="plan-dropdown">
+                                                <button onClick={(e) => { e.stopPropagation(); handleStartRename(plan); }}>
+                                                    ✏️ {t.renamePlan}
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); exportPlanCSV(); setActiveMenu(null); }}>
+                                                    📤 {t.exportCSV}
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); exportPlanTXT(); setActiveMenu(null); }}>
+                                                    📤 {t.exportTXT}
+                                                </button>
+                                                <button
+                                                    className="delete-option"
+                                                    onClick={(e) => { e.stopPropagation(); handleDeletePlan(plan.id); }}
+                                                >
+                                                    🗑️ {t.deletePlan}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Add Plan Button */}
+                        <div className="add-plan-wrapper">
+                            <button
+                                className="add-plan-btn"
+                                onClick={() => setAddPlanMenuOpen(!addPlanMenuOpen)}
+                            >
+                                + {t.addPlan}
+                            </button>
+                            {addPlanMenuOpen && (
+                                <div className="add-plan-menu">
+                                    <button onClick={handleCreatePlan}>
+                                        ✏️ {t.createManually}
+                                    </button>
+                                    <button onClick={handleImportPlan}>
+                                        📥 {t.importPlan}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </aside>
+
+                {/* Sidebar Toggle Button - Outside sidebar for guaranteed visibility */}
+                <button
+                    className={`sidebar-toggle-btn ${sidebarOpen ? 'open' : 'closed'}`}
+                    onClick={toggleSidebar}
+                >
+                    {sidebarOpen ? '‹' : '›'}
+                </button>
+
                 {/* Main Content Area */}
                 <main className="planning-main">
                     {/* Exchange Rate Button - Top Right (Sticky) */}
@@ -274,13 +827,30 @@ const PlanningPage = () => {
 
                     {/* Content Container */}
                     <div className="content-container">
+                        {/* No Plan Selected Message */}
+                        {!currentPlanId && plans.length === 0 && (
+                            <div className="no-plan-message">
+                                <p>{t.noPlansYet}</p>
+                                <button onClick={handleCreatePlan} className="create-first-plan-btn">
+                                    + {t.addPlan}
+                                </button>
+                            </div>
+                        )}
+
                         {/* Accounts Section */}
-                        {accounts.length > 0 && (
+                        {currentPlanId && accounts.length > 0 && (
                             <div className="section accounts-section">
-                                <h3 className="section-label">{t.addAccount.replace('Add ', '')}</h3>
+                                <h3 className="section-label">{t.sectionAccount}</h3>
                                 <div className="cards-grid">
-                                    {accounts.map(account => (
-                                        <div key={account.id} className="card account-card">
+                                    {accounts.map((account, index) => (
+                                        <div
+                                            key={account.id}
+                                            className={`card account-card ${dragItem === index && dragType.current?.type === 'account' ? 'dragging' : ''} ${dragOverItem === index && dragType.current?.type === 'account' ? 'drag-over' : ''}`}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, index, 'account')}
+                                            onDragOver={(e) => handleDragOver(e, index)}
+                                            onDragEnd={handleDragEnd}
+                                        >
                                             <div className="card-content">
                                                 <span className="card-title">{account.name}</span>
                                                 <span className="card-subtitle">{account.currency}</span>
@@ -324,150 +894,77 @@ const PlanningPage = () => {
                         )}
 
                         {/* Investments Section */}
-                        {investments.length > 0 && (
+                        {currentPlanId && (investments.length > 0 || groups.length > 0) && (
                             <div className="section investments-section">
-                                <h3 className="section-label">{t.addInvestment.replace('Add ', '')}</h3>
-                                <div className="cards-grid investments-grid">
-                                    {investments.map(investment => {
-                                        const dcaCount = getDcaCompletionCount(investment.id);
-                                        const schedule = generateDcaSchedule(investment);
+                                <h3 className="section-label">{t.sectionInvestment}</h3>
 
-                                        return (
-                                            <div
-                                                key={investment.id}
-                                                className={`card investment-card ${expandedInvestment === investment.id ? 'expanded' : ''} ${isInvestmentOverspent(investment.id) ? 'overspent' : ''}`}
-                                            >
-                                                {/* Card Header */}
-                                                <div className="investment-header">
-                                                    <span className="investment-name">{investment.name}</span>
-                                                    <button
-                                                        className="menu-btn visible"
-                                                        onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === `inv-${investment.id}` ? null : `inv-${investment.id}`); }}
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                                                            <circle cx="12" cy="5" r="2"></circle>
-                                                            <circle cx="12" cy="12" r="2"></circle>
-                                                            <circle cx="12" cy="19" r="2"></circle>
-                                                        </svg>
-                                                    </button>
-                                                    {activeMenu === `inv-${investment.id}` && (
-                                                        <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-                                                            <button onClick={() => openEditInvestment(investment)}>
-                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                                </svg>
-                                                                {t.edit}
-                                                            </button>
-                                                            <button onClick={() => { removeInvestment(investment.id); setActiveMenu(null); }} className="delete-option">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                                </svg>
-                                                                {t.delete}
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                {/* Render root groups */}
+                                {getRootGroups().map((group, idx) => renderGroup(group, 0, idx, null))}
 
-                                                {/* Percentage */}
-                                                <div className="investment-percentage">{investment.percentage}%</div>
-
-                                                {/* Cost (auto-calculated) */}
-                                                <div className="investment-cost">
-                                                    {getCostDisplay(investment.id)}
-                                                </div>
-
-                                                {/* DCA Info */}
-                                                <div
-                                                    className="investment-dca"
-                                                    onClick={() => setExpandedInvestment(expandedInvestment === investment.id ? null : investment.id)}
-                                                >
-                                                    <span className="dca-timeframe">{getDcaDisplay(investment)}</span>
-                                                    {investment.dcaStartDate && (
-                                                        <>
-                                                            <span className="dca-count">
-                                                                {dcaCount.completed}/{dcaCount.total}
-                                                            </span>
-                                                            {investment.dcaEndDate && dcaCount.total > 0 && (
-                                                                <span className="dca-per-amount">
-                                                                    {getPerDcaDisplay(investment.id)}/ea
-                                                                </span>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-
-                                                {/* Expanded DCA Schedule */}
-                                                {expandedInvestment === investment.id && (
-                                                    <div className="dca-schedule">
-                                                        <h4>{t.dcaSchedule}</h4>
-                                                        {schedule.length === 0 ? (
-                                                            <p className="no-schedule">{t.noSchedule}</p>
-                                                        ) : (
-                                                            <div className="schedule-list">
-                                                                {schedule.map((item, idx) => (
-                                                                    <label key={idx} className="schedule-item">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={item.completed}
-                                                                            onChange={() => toggleDcaCompletion(investment.id, item.date)}
-                                                                        />
-                                                                        <span className={item.completed ? 'completed' : ''}>
-                                                                            {formatDate(item.date)}
-                                                                        </span>
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
+                                {/* Render ungrouped investments */}
+                                {getUngroupedInvestments().length > 0 && (
+                                    <div className="ungrouped-section">
+                                        {groups.length > 0 && (
+                                            <div className="ungrouped-header">
+                                                <span className="ungrouped-label">{t.ungrouped}</span>
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                        )}
+                                        <div className="cards-grid investments-grid">
+                                            {getUngroupedInvestments().map((inv, idx) => renderInvestmentCard(inv, null, idx, null))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
+                    </div>
 
-                        {/* Add Buttons */}
-                        <div className="add-buttons">
+                    {/* FAB Button */}
+                    {currentPlanId && (
+                        <div className={`fab-container ${fabOpen ? 'open' : ''}`}>
+                            {fabOpen && (
+                                <div className="fab-menu">
+                                    <button
+                                        className="fab-menu-item"
+                                        onClick={() => { setShowAccountModal(true); setFabOpen(false); }}
+                                    >
+                                        💰 {t.addAccount}
+                                    </button>
+                                    <button
+                                        className="fab-menu-item"
+                                        onClick={() => { setShowGroupModal(true); setFabOpen(false); }}
+                                    >
+                                        📁 {t.addGrouping}
+                                    </button>
+                                    <button
+                                        className={`fab-menu-item ${accounts.length === 0 ? 'disabled' : ''}`}
+                                        onClick={() => {
+                                            if (accounts.length > 0) {
+                                                setShowInvestmentModal(true);
+                                                setFabOpen(false);
+                                            }
+                                        }}
+                                        title={accounts.length === 0 ? 'Add an account first' : ''}
+                                    >
+                                        📊 {t.addInvestment}
+                                    </button>
+                                </div>
+                            )}
                             <button
-                                className="add-btn"
-                                onClick={() => { resetAccountForm(); setShowAccountModal(true); }}
+                                className="fab-button"
+                                onClick={() => setFabOpen(!fabOpen)}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                                {t.addAccount}
-                            </button>
-
-                            <button
-                                className="add-btn primary"
-                                onClick={() => { resetInvestmentForm(); setShowInvestmentModal(true); }}
-                                disabled={accounts.length === 0}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                                {t.addInvestment}
+                                {fabOpen ? '✕' : '+'}
                             </button>
                         </div>
-                    </div>
+                    )}
                 </main>
             </div>
-
-            {/* Click outside to close menu */}
-            {activeMenu && (
-                <div className="menu-backdrop" onClick={() => setActiveMenu(null)} />
-            )}
 
             {/* Account Modal */}
             {showAccountModal && (
                 <div className="modal-overlay" onClick={resetAccountForm}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
-                        <h3>{editingAccount ? t.editAccount : t.addAccount}</h3>
+                        <h2>{editingAccount ? t.editAccount : t.addAccount}</h2>
                         <form onSubmit={handleAccountSubmit}>
                             <div className="form-group">
                                 <label>{t.accountName}</label>
@@ -477,28 +974,29 @@ const PlanningPage = () => {
                                     onChange={(e) => setAccountForm(prev => ({ ...prev, name: e.target.value }))}
                                     placeholder={t.accountName}
                                     required
-                                    autoFocus
                                 />
                             </div>
-                            <div className="form-group">
-                                <label>{t.currency}</label>
-                                <select
-                                    value={accountForm.currency}
-                                    onChange={(e) => setAccountForm(prev => ({ ...prev, currency: e.target.value }))}
-                                >
-                                    <option value="THB">THB (฿)</option>
-                                    <option value="USD">USD ($)</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>{t.amount}</label>
-                                <input
-                                    type="number"
-                                    value={accountForm.amount}
-                                    onChange={(e) => setAccountForm(prev => ({ ...prev, amount: e.target.value }))}
-                                    placeholder="0"
-                                    min="0"
-                                />
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>{t.currency}</label>
+                                    <select
+                                        value={accountForm.currency}
+                                        onChange={(e) => setAccountForm(prev => ({ ...prev, currency: e.target.value }))}
+                                    >
+                                        <option value="THB">THB (฿)</option>
+                                        <option value="USD">USD ($)</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>{t.amount}</label>
+                                    <input
+                                        type="number"
+                                        value={accountForm.amount}
+                                        onChange={(e) => setAccountForm(prev => ({ ...prev, amount: e.target.value }))}
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
                             </div>
                             <div className="modal-actions">
                                 <button type="button" className="btn-cancel" onClick={resetAccountForm}>
@@ -516,67 +1014,67 @@ const PlanningPage = () => {
             {/* Investment Modal */}
             {showInvestmentModal && (
                 <div className="modal-overlay" onClick={resetInvestmentForm}>
-                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-                        <h3>{editingInvestment ? t.editInvestment : t.addInvestment}</h3>
+                    <div className="modal investment-modal" onClick={e => e.stopPropagation()}>
+                        <h2>{editingInvestment ? t.editInvestment : t.addInvestment}</h2>
                         <form onSubmit={handleInvestmentSubmit}>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>{t.investmentName}</label>
-                                    <input
-                                        type="text"
-                                        value={investmentForm.name}
-                                        onChange={(e) => setInvestmentForm(prev => ({ ...prev, name: e.target.value }))}
-                                        placeholder={t.investmentName}
-                                        required
-                                        autoFocus
-                                    />
-                                </div>
-                                <div className="form-group small">
-                                    <label>{t.percentage}</label>
-                                    <input
-                                        type="number"
-                                        value={investmentForm.percentage}
-                                        onChange={(e) => setInvestmentForm(prev => ({ ...prev, percentage: e.target.value }))}
-                                        placeholder="0"
-                                        min="0"
-                                        max="100"
-                                    />
-                                </div>
+                            <div className="form-group">
+                                <label>{t.investmentName}</label>
+                                <input
+                                    type="text"
+                                    value={investmentForm.name}
+                                    onChange={(e) => setInvestmentForm(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder={t.investmentName}
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>{t.percentage} (%)</label>
+                                <input
+                                    type="number"
+                                    value={investmentForm.percentage}
+                                    onChange={(e) => setInvestmentForm(prev => ({ ...prev, percentage: e.target.value }))}
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                />
                             </div>
 
                             <div className="form-group">
                                 <label>{t.accountPriority}</label>
                                 <div className="priority-list">
-                                    {accounts.map(account => (
-                                        <button
-                                            key={account.id}
-                                            type="button"
-                                            className={`priority-btn ${investmentForm.accountPriority.includes(account.id) ? 'selected' : ''}`}
-                                            onClick={() => toggleAccountPriority(account.id)}
-                                        >
-                                            <span className="priority-order">
-                                                {investmentForm.accountPriority.includes(account.id)
-                                                    ? getPriorityLabel(investmentForm.accountPriority.indexOf(account.id))
-                                                    : '-'}
-                                            </span>
-                                            <span className="priority-name">{account.name}</span>
-                                            <span className="priority-currency">{account.currency}</span>
-                                        </button>
-                                    ))}
+                                    {accounts.map(account => {
+                                        const priorityIndex = investmentForm.accountPriority.indexOf(account.id);
+                                        const isSelected = priorityIndex >= 0;
+                                        return (
+                                            <button
+                                                key={account.id}
+                                                type="button"
+                                                className={`priority-item ${isSelected ? 'selected' : ''}`}
+                                                onClick={() => toggleAccountPriority(account.id)}
+                                            >
+                                                <span className="priority-badge">
+                                                    {isSelected ? getPriorityLabel(priorityIndex) : ''}
+                                                </span>
+                                                <span>{account.name}</span>
+                                                <span className="priority-currency">{account.currency}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
                             <div className="form-group">
                                 <label>{t.dcaTimeframe}</label>
                                 <div className="dca-options">
-                                    {['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'].map(option => (
+                                    {['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'].map(type => (
                                         <button
-                                            key={option}
+                                            key={type}
                                             type="button"
-                                            className={`dca-option ${investmentForm.dcaType === option ? 'selected' : ''}`}
-                                            onClick={() => setInvestmentForm(prev => ({ ...prev, dcaType: option }))}
+                                            className={`dca-option ${investmentForm.dcaType === type ? 'selected' : ''}`}
+                                            onClick={() => setInvestmentForm(prev => ({ ...prev, dcaType: type }))}
                                         >
-                                            {t[option]}
+                                            {t[type]}
                                         </button>
                                     ))}
                                 </div>
@@ -624,6 +1122,114 @@ const PlanningPage = () => {
 
                             <div className="modal-actions">
                                 <button type="button" className="btn-cancel" onClick={resetInvestmentForm}>
+                                    {t.cancel}
+                                </button>
+                                <button type="submit" className="btn-save">
+                                    {t.save}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Group Modal */}
+            {showGroupModal && (
+                <div className="modal-overlay" onClick={resetGroupForm}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <h2>{editingGroup ? t.editGroup : t.addGrouping}</h2>
+                        <form onSubmit={handleGroupSubmit}>
+                            <div className="form-group">
+                                <label>{t.groupName}</label>
+                                <input
+                                    type="text"
+                                    value={groupForm.name}
+                                    onChange={(e) => setGroupForm(prev => ({ ...prev, name: e.target.value }))}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>{t.groupColor}</label>
+                                <div className="color-picker-container">
+                                    {/* Saturation/Brightness gradient */}
+                                    <div
+                                        className="color-gradient"
+                                        style={{ backgroundColor: `hsl(${colorHue}, 100%, 50%)` }}
+                                        onClick={handleColorPickerClick}
+                                        onMouseDown={(e) => {
+                                            const handleMove = (moveE) => handleColorPickerClick(moveE);
+                                            const handleUp = () => {
+                                                document.removeEventListener('mousemove', handleMove);
+                                                document.removeEventListener('mouseup', handleUp);
+                                            };
+                                            document.addEventListener('mousemove', handleMove);
+                                            document.addEventListener('mouseup', handleUp);
+                                        }}
+                                    >
+                                        <div className="color-gradient-white"></div>
+                                        <div className="color-gradient-black"></div>
+                                    </div>
+
+                                    {/* Hue bar */}
+                                    <div
+                                        className="hue-bar"
+                                        onClick={handleHueClick}
+                                        onMouseDown={(e) => {
+                                            const handleMove = (moveE) => handleHueClick(moveE);
+                                            const handleUp = () => {
+                                                document.removeEventListener('mousemove', handleMove);
+                                                document.removeEventListener('mouseup', handleUp);
+                                            };
+                                            document.addEventListener('mousemove', handleMove);
+                                            document.addEventListener('mouseup', handleUp);
+                                        }}
+                                    >
+                                        <div
+                                            className="hue-indicator"
+                                            style={{ left: `${(colorHue / 360) * 100}%` }}
+                                        ></div>
+                                    </div>
+
+                                    {/* Color preview */}
+                                    <div className="color-preview-row">
+                                        <div
+                                            className="color-preview-large"
+                                            style={{ backgroundColor: `rgb(${groupForm.color.r}, ${groupForm.color.g}, ${groupForm.color.b})` }}
+                                        ></div>
+                                        <span className="color-rgb-text">
+                                            RGB({groupForm.color.r}, {groupForm.color.g}, {groupForm.color.b})
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>{t.groupPercentage}: {groupForm.percentage}%</label>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="100"
+                                    value={groupForm.percentage}
+                                    onChange={(e) => setGroupForm(prev => ({ ...prev, percentage: parseInt(e.target.value) }))}
+                                    className="percentage-slider"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>{t.parentGroup}</label>
+                                <select
+                                    value={groupForm.parentGroupId || ''}
+                                    onChange={(e) => setGroupForm(prev => ({ ...prev, parentGroupId: e.target.value || null }))}
+                                >
+                                    <option value="">{t.noParent}</option>
+                                    {groups
+                                        .filter(g => editingGroup ? g.id !== editingGroup.id : true)
+                                        .map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                            <div className="modal-actions">
+                                <button type="button" className="btn-cancel" onClick={resetGroupForm}>
                                     {t.cancel}
                                 </button>
                                 <button type="submit" className="btn-save">

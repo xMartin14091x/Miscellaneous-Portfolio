@@ -37,6 +37,8 @@ export const translations = {
         exchangeRate: 'Exchange Rate',
         addInvestment: 'Add Investment',
         addAccount: 'Add Account',
+        sectionAccount: 'Account',
+        sectionInvestment: 'Investment',
 
         // Account Form
         accountName: 'Account Name',
@@ -74,6 +76,34 @@ export const translations = {
         savedPlans: 'Saved Plans',
         newPlan: 'New Plan',
         noPlansSaved: 'No plans saved yet',
+
+        // Plans Sidebar
+        plans: 'Plans:',
+        addPlan: 'Add Plan',
+        createManually: 'Create Manually',
+        importPlan: 'Import Plan',
+        renamePlan: 'Rename',
+        deletePlan: 'Delete Plan',
+        exportCSV: 'Export CSV',
+        exportTXT: 'Export TXT',
+        planName: 'Plan Name',
+        untitledPlan: 'Untitled Plan',
+        confirmDeletePlan: 'Are you sure you want to delete this plan?',
+        noPlansYet: 'No plans yet',
+        myPlan: 'My Plan',
+
+        // Grouping
+        addGrouping: 'Add Grouping',
+        groupName: 'Group Name',
+        groupColor: 'Color',
+        groupPercentage: 'Percentage of Funds',
+        parentGroup: 'Parent Group',
+        noParent: 'None (Root Level)',
+        editGroup: 'Edit Group',
+        deleteGroup: 'Delete Group',
+        moveToGroup: 'Move to Group',
+        ungrouped: 'Ungrouped',
+        groupFund: 'Group Fund',
 
         // General
         delete: 'Delete',
@@ -164,6 +194,8 @@ export const translations = {
         exchangeRate: 'อัตราแลกเปลี่ยน',
         addInvestment: 'เพิ่มการลงทุน',
         addAccount: 'เพิ่มบัญชี',
+        sectionAccount: 'บัญชี',
+        sectionInvestment: 'การลงทุน',
 
         // Account Form
         accountName: 'ชื่อบัญชี',
@@ -201,6 +233,34 @@ export const translations = {
         savedPlans: 'แผนที่บันทึก',
         newPlan: 'แผนใหม่',
         noPlansSaved: 'ยังไม่มีแผนที่บันทึก',
+
+        // Plans Sidebar
+        plans: 'แผน:',
+        addPlan: 'เพิ่มแผน',
+        createManually: 'สร้างด้วยตนเอง',
+        importPlan: 'นำเข้าแผน',
+        renamePlan: 'เปลี่ยนชื่อ',
+        deletePlan: 'ลบแผน',
+        exportCSV: 'ส่งออก CSV',
+        exportTXT: 'ส่งออก TXT',
+        planName: 'ชื่อแผน',
+        untitledPlan: 'แผนไม่มีชื่อ',
+        confirmDeletePlan: 'คุณแน่ใจหรือไม่ว่าต้องการลบแผนนี้?',
+        noPlansYet: 'ยังไม่มีแผน',
+        myPlan: 'แผนของฉัน',
+
+        // Grouping
+        addGrouping: 'เพิ่มกลุ่ม',
+        groupName: 'ชื่อกลุ่ม',
+        groupColor: 'สี',
+        groupPercentage: 'เปอร์เซ็นต์ของเงินทุน',
+        parentGroup: 'กลุ่มหลัก',
+        noParent: 'ไม่มี (ระดับบนสุด)',
+        editGroup: 'แก้ไขกลุ่ม',
+        deleteGroup: 'ลบกลุ่ม',
+        moveToGroup: 'ย้ายไปกลุ่ม',
+        ungrouped: 'ไม่จัดกลุ่ม',
+        groupFund: 'เงินทุนกลุ่ม',
 
         // General
         delete: 'ลบ',
