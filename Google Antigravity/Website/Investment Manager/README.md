@@ -20,13 +20,29 @@ A comprehensive investment planning web application with Firebase authentication
 - 🌙 **Dark/Light Theme** - User preference saved
 - 🌐 **Bilingual** - English and Thai (ภาษาไทย)
 - 📁 **Investment Groups** - Organize investments with colored groups and nested subgroups
-- 🎨 **Visual Color Picker** - HSV gradient picker for group colors
+- 🎨 **Visual Color Picker** - HSV gradient picker with gradient presets for group colors
 - 🔄 **Drag & Drop Reordering** - Reorder plans, accounts, groups, and investments
 - 📋 **Multiple Plans** - Create and switch between different investment plans
+- ✨ **Dynamic Group Colors** - Investment cards and DCA elements adapt to group color
+- 🎬 **Smooth Animations** - Slide-in/out animations for dropdowns and cards
 
 ---
 
 ## 📋 Changelog
+
+### v1.3.0 (December 24, 2024)
+**New Features:**
+- **Gradient Color Support** - Groups can now use gradient colors from presets
+- **Dynamic Group Theming** - Investment cards, DCA badges, and checkboxes use group color
+- **Slide Animations** - All dropdowns have 0.5s slide-in/out animations
+- **Card Animations** - Investment cards slide in with 0.3s animation
+- **Group Border Animation** - Left border animates top-to-bottom on expand
+- **Click Outside to Close** - Dropdowns close when clicking outside
+
+**Improvements:**
+- Group fund amount now shows 2 decimal places (rounded down)
+- Firebase sync debounce reduced from 10s to 3s for faster saving
+- Ungrouped card color updated to #10b981
 
 ### v1.2.0 (December 23, 2024)
 **Bug Fixes:**
