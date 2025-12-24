@@ -69,6 +69,7 @@ const PlanningPage = () => {
     const [activeMenu, setActiveMenu] = useState(null);
     const [fabOpen, setFabOpen] = useState(false);
     const [addPlanMenuOpen, setAddPlanMenuOpen] = useState(false);
+    const [closingMenu, setClosingMenu] = useState(null); // Track menu being closed for exit animation
     const [renamingPlanId, setRenamingPlanId] = useState(null);
     const [renamePlanValue, setRenamePlanValue] = useState('');
     const fileInputRef = useRef(null);
@@ -101,11 +102,83 @@ const PlanningPage = () => {
     const [groupForm, setGroupForm] = useState({
         name: '',
         color: { r: 34, g: 197, b: 94 },
+        gradient: null, // { start: {r,g,b}, end: {r,g,b} } or null for solid colors
         percentage: 100,
         parentGroupId: null
     });
     const [colorHue, setColorHue] = useState(145); // Default green hue
     const colorPickerRef = useRef(null);
+    const [editingRgb, setEditingRgb] = useState(null); // 'r', 'g', 'b', or null
+    const [rgbInputValue, setRgbInputValue] = useState('');
+
+    // Preset color palettes
+    const colorPalettes = {
+        vibrant: [
+            { r: 239, g: 68, b: 68 },   // Red
+            { r: 249, g: 115, b: 22 },  // Orange
+            { r: 234, g: 179, b: 8 },   // Yellow
+            { r: 34, g: 197, b: 94 },   // Green
+            { r: 6, g: 182, b: 212 },   // Cyan
+            { r: 59, g: 130, b: 246 },  // Blue
+            { r: 139, g: 92, b: 246 },  // Violet
+            { r: 236, g: 72, b: 153 },  // Pink
+        ],
+        pastel: [
+            { r: 254, g: 202, b: 202 }, // Pastel Red
+            { r: 254, g: 215, b: 170 }, // Pastel Orange
+            { r: 254, g: 240, b: 138 }, // Pastel Yellow
+            { r: 187, g: 247, b: 208 }, // Pastel Green
+            { r: 165, g: 243, b: 252 }, // Pastel Cyan
+            { r: 191, g: 219, b: 254 }, // Pastel Blue
+            { r: 221, g: 214, b: 254 }, // Pastel Violet
+            { r: 251, g: 207, b: 232 }, // Pastel Pink
+        ],
+        earth: [
+            { r: 120, g: 53, b: 15 },   // Brown
+            { r: 180, g: 83, b: 9 },    // Amber
+            { r: 146, g: 64, b: 14 },   // Rust
+            { r: 101, g: 163, b: 13 },  // Lime
+            { r: 22, g: 101, b: 52 },   // Forest
+            { r: 13, g: 148, b: 136 },  // Teal
+            { r: 30, g: 58, b: 138 },   // Navy
+            { r: 76, g: 29, b: 149 },   // Indigo
+        ]
+    };
+    // Gradient presets (start and end colors)
+    const gradientPresets = [
+        { name: 'Sunset', start: { r: 255, g: 94, b: 77 }, end: { r: 255, g: 195, b: 113 } },
+        { name: 'Ocean', start: { r: 0, g: 180, b: 216 }, end: { r: 0, g: 119, b: 182 } },
+        { name: 'Forest', start: { r: 34, g: 139, b: 34 }, end: { r: 144, g: 238, b: 144 } },
+        { name: 'Purple', start: { r: 147, g: 51, b: 234 }, end: { r: 236, g: 72, b: 153 } },
+        { name: 'Gold', start: { r: 255, g: 215, b: 0 }, end: { r: 255, g: 140, b: 0 } },
+        { name: 'Mint', start: { r: 16, g: 185, b: 129 }, end: { r: 52, g: 211, b: 153 } },
+    ];
+
+    // Recent colors (latest used)
+    const [recentColors, setRecentColors] = useState([]);
+
+    // Add color to recent when form submits (track in separate effect)
+    const addToRecentColors = (color) => {
+        setRecentColors(prev => {
+            const exists = prev.some(c => c.r === color.r && c.g === color.g && c.b === color.b);
+            if (exists) return prev;
+            const updated = [color, ...prev.slice(0, 7)]; // Keep last 8
+            return updated;
+        });
+    };
+    const handleRgbEdit = (channel) => {
+        setEditingRgb(channel);
+        setRgbInputValue(groupForm.color[channel].toString());
+    };
+
+    const handleRgbInputConfirm = () => {
+        const value = Math.max(0, Math.min(255, parseInt(rgbInputValue) || 0));
+        setGroupForm(prev => ({
+            ...prev,
+            color: { ...prev.color, [editingRgb]: value }
+        }));
+        setEditingRgb(null);
+    };
 
     // HSV to RGB conversion
     const hsvToRgb = (h, s, v) => {
@@ -264,6 +337,9 @@ const PlanningPage = () => {
     const handleGroupSubmit = (e) => {
         e.preventDefault();
         if (groupForm.name.trim()) {
+            // Track recent color
+            addToRecentColors(groupForm.color);
+
             if (editingGroup) {
                 updateGroup(editingGroup.id, groupForm);
             } else {
@@ -277,6 +353,7 @@ const PlanningPage = () => {
         setGroupForm({
             name: '',
             color: { r: 34, g: 197, b: 94 },
+            gradient: null,
             percentage: 100,
             parentGroupId: null
         });
@@ -289,6 +366,7 @@ const PlanningPage = () => {
         setGroupForm({
             name: group.name,
             color: group.color || { r: 34, g: 197, b: 94 },
+            gradient: group.gradient || null,
             percentage: group.percentage || 100,
             parentGroupId: group.parentGroupId || null
         });
@@ -398,7 +476,7 @@ const PlanningPage = () => {
     const renderInvestmentCard = (investment, groupColor = null, index = 0, groupId = null) => {
         const dcaCount = getDcaCompletionCount(investment.id);
         const schedule = generateDcaSchedule(investment);
-        const glowColor = groupColor || { r: 34, g: 197, b: 94 }; // Default green for ungrouped
+        const glowColor = groupColor || { r: 16, g: 185, b: 129 }; // Default green (#10b981) for ungrouped
 
         return (
             <div
@@ -406,7 +484,8 @@ const PlanningPage = () => {
                 className={`card investment-card ${expandedInvestment === investment.id ? 'expanded' : ''} ${isInvestmentOverspent(investment.id) ? 'overspent' : ''} ${dragItem === index && dragType.current?.type === 'investment' && dragType.current?.parentId === groupId ? 'dragging' : ''} ${dragOverItem === index && dragType.current?.type === 'investment' && dragType.current?.parentId === groupId ? 'drag-over' : ''}`}
                 style={{
                     '--card-glow-color': `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.25)`,
-                    '--card-glow-color-subtle': `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.15)`
+                    '--card-glow-color-subtle': `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.15)`,
+                    '--card-accent-color': `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})`
                 }}
                 draggable
                 onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, index, 'investment', groupId); }}
@@ -416,7 +495,7 @@ const PlanningPage = () => {
                 {/* Row 1: Name + Percentage + 3-dot menu */}
                 <div className="investment-header">
                     <span className="investment-name">{investment.name}</span>
-                    <span className="investment-percentage">{investment.percentage}%</span>
+                    <span className="investment-percentage" style={{ color: `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})` }}>{investment.percentage}%</span>
                     <button
                         className="menu-btn visible"
                         onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === `inv-${investment.id}` ? null : `inv-${investment.id}`); }}
@@ -427,8 +506,8 @@ const PlanningPage = () => {
                             <circle cx="12" cy="19" r="2"></circle>
                         </svg>
                     </button>
-                    {activeMenu === `inv-${investment.id}` && (
-                        <div className="dropdown-menu">
+                    {(activeMenu === `inv-${investment.id}` || closingMenu === `inv-${investment.id}`) && (
+                        <div className={`dropdown-menu ${closingMenu === `inv-${investment.id}` ? 'closing' : ''}`}>
                             <button onClick={() => openEditInvestment(investment)}>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -464,14 +543,24 @@ const PlanningPage = () => {
 
                 {/* Row 2: Cost */}
                 <div className="investment-cost-row">
-                    <span className={`investment-cost ${isInvestmentOverspent(investment.id) ? 'overspent-text' : ''}`}>
+                    <span
+                        className={`investment-cost ${isInvestmentOverspent(investment.id) ? 'overspent-text' : ''}`}
+                        style={!isInvestmentOverspent(investment.id) ? { color: `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})` } : {}}
+                    >
                         {getCostDisplay(investment.id)}
                     </span>
                 </div>
 
                 {/* Row 3: DCA Type + Timeframe + Per DCA Cost */}
                 <div className="investment-dca-row" onClick={() => setExpandedInvestment(expandedInvestment === investment.id ? null : investment.id)}>
-                    <span className="dca-type-badge">{getDcaDisplay(investment)}</span>
+                    <span
+                        className="dca-type-badge"
+                        style={{
+                            backgroundColor: `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.15)`,
+                            color: `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})`,
+                            borderColor: `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})`
+                        }}
+                    >{getDcaDisplay(investment)}</span>
                     {dcaCount.total > 0 && (
                         <div className="dca-info-group">
                             <span className="dca-count-display">
@@ -479,7 +568,10 @@ const PlanningPage = () => {
                                 {investment.dcaEndDate && ` → ${formatDate(investment.dcaEndDate)}`}
                             </span>
                             {investment.dcaEndDate && (
-                                <span className="dca-per-cost">
+                                <span
+                                    className="dca-per-cost"
+                                    style={{ color: `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})` }}
+                                >
                                     {getPerDcaDisplay(investment.id)}/DCA
                                 </span>
                             )}
@@ -489,7 +581,13 @@ const PlanningPage = () => {
 
                 {/* Expanded DCA Schedule */}
                 {expandedInvestment === investment.id && schedule.length > 0 && (
-                    <div className="dca-schedule-panel">
+                    <div
+                        className="dca-schedule-panel"
+                        style={{
+                            '--dca-accent-color': `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})`,
+                            '--dca-accent-light': `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.15)`
+                        }}
+                    >
                         <div className="dca-dates-list">
                             {schedule.map((item, index) => (
                                 <button
@@ -499,8 +597,18 @@ const PlanningPage = () => {
                                         e.stopPropagation();
                                         toggleDcaCompletion(investment.id, item.date);
                                     }}
+                                    style={item.completed ? {
+                                        backgroundColor: `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.15)`,
+                                        borderColor: `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})`
+                                    } : {}}
                                 >
-                                    <span className="dca-checkbox">{item.completed ? '✓' : ''}</span>
+                                    <span
+                                        className="dca-checkbox"
+                                        style={{
+                                            borderColor: `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})`,
+                                            color: item.completed ? `rgb(${glowColor.r}, ${glowColor.g}, ${glowColor.b})` : 'transparent'
+                                        }}
+                                    >{item.completed ? '✓' : ''}</span>
                                     <span className="dca-date">{formatDate(item.date)}</span>
                                 </button>
                             ))}
@@ -517,22 +625,35 @@ const PlanningPage = () => {
         const childGroups = getChildGroups(group.id);
         const groupInvestments = getGroupInvestments(group.id);
         const groupColor = group.color || { r: 34, g: 197, b: 94 };
+        const groupGradient = group.gradient; // { start, end } or null
         const fundAmount = getGroupFundAmount(group.id);
         const dragKey = `group-${parentGroupId || 'root'}`;
+
+        // Generate background style for header (gradient or solid)
+        const headerBgStyle = groupGradient
+            ? { background: `linear-gradient(135deg, rgba(${groupGradient.start.r}, ${groupGradient.start.g}, ${groupGradient.start.b}, 0.15), rgba(${groupGradient.end.r}, ${groupGradient.end.g}, ${groupGradient.end.b}, 0.15))` }
+            : { backgroundColor: `rgba(${groupColor.r}, ${groupColor.g}, ${groupColor.b}, 0.1)` };
+
+        // Generate color indicator style (gradient or solid)
+        const indicatorStyle = groupGradient
+            ? { background: `linear-gradient(135deg, rgb(${groupGradient.start.r}, ${groupGradient.start.g}, ${groupGradient.start.b}), rgb(${groupGradient.end.r}, ${groupGradient.end.g}, ${groupGradient.end.b}))` }
+            : { backgroundColor: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` };
 
         return (
             <div
                 key={group.id}
-                className={`investment-group ${dragItem === index && dragType.current?.type === 'group' && dragType.current?.parentId === parentGroupId ? 'dragging' : ''} ${dragOverItem === index && dragType.current?.type === 'group' && dragType.current?.parentId === parentGroupId ? 'drag-over' : ''}`}
+                className={`investment-group ${isExpanded ? 'expanded' : 'collapsed'} ${dragItem === index && dragType.current?.type === 'group' && dragType.current?.parentId === parentGroupId ? 'dragging' : ''} ${dragOverItem === index && dragType.current?.type === 'group' && dragType.current?.parentId === parentGroupId ? 'drag-over' : ''}`}
                 style={{
                     marginLeft: depth > 0 ? '1.5rem' : 0,
-                    borderLeftColor: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})`
+                    '--group-border-color': groupGradient
+                        ? `linear-gradient(to bottom, rgb(${groupGradient.start.r}, ${groupGradient.start.g}, ${groupGradient.start.b}), rgb(${groupGradient.end.r}, ${groupGradient.end.g}, ${groupGradient.end.b}))`
+                        : `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})`
                 }}
             >
                 <div
                     className="group-header"
                     onClick={() => toggleGroupExpand(group.id)}
-                    style={{ backgroundColor: `rgba(${groupColor.r}, ${groupColor.g}, ${groupColor.b}, 0.1)` }}
+                    style={headerBgStyle}
                     draggable
                     onDragStart={(e) => handleDragStart(e, index, 'group', parentGroupId)}
                     onDragOver={(e) => handleDragOver(e, index)}
@@ -541,14 +662,14 @@ const PlanningPage = () => {
                     <span className="group-expand-icon">{isExpanded ? '▼' : '▶'}</span>
                     <span
                         className="group-color-indicator"
-                        style={{ backgroundColor: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` }}
+                        style={indicatorStyle}
                     ></span>
-                    <span className="group-name">{group.name}</span>
-                    <span className="group-percentage">{group.percentage}%</span>
-                    <span className="group-fund">
-                        ฿{fundAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    <span className="group-name" style={{ color: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` }}>{group.name}</span>
+                    <span className="group-percentage" style={{ color: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` }}>{group.percentage}%</span>
+                    <span className="group-fund" style={{ color: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` }}>
+                        ฿{(Math.floor(fundAmount * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         <span className="group-fund-usd">
-                            ${(fundAmount / exchangeRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            ${(Math.floor((fundAmount / exchangeRate) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                     </span>
                     <button
@@ -567,8 +688,8 @@ const PlanningPage = () => {
                 </div>
 
                 {/* Group dropdown - OUTSIDE group-header to prevent hover conflicts */}
-                {activeMenu === `grp-${group.id}` && (
-                    <div className="dropdown-menu group-dropdown" style={{ position: 'absolute', top: '3rem', right: '0.5rem', zIndex: 9999 }}>
+                {(activeMenu === `grp-${group.id}` || closingMenu === `grp-${group.id}`) && (
+                    <div className={`dropdown-menu group-dropdown ${closingMenu === `grp-${group.id}` ? 'closing' : ''}`} style={{ position: 'absolute', top: '3rem', right: '0.5rem', zIndex: 9999 }}>
                         <button onClick={() => openEditGroup(group)}>
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -661,7 +782,32 @@ const PlanningPage = () => {
     }
 
     return (
-        <div className="planning-page">
+        <div
+            className="planning-page"
+            onClick={(e) => {
+                // Close menus when clicking outside dropdown/menu areas
+                if (!e.target.closest('.dropdown-menu') &&
+                    !e.target.closest('.plan-dropdown') &&
+                    !e.target.closest('.menu-btn') &&
+                    !e.target.closest('.plan-menu-btn') &&
+                    !e.target.closest('.fab-button') &&
+                    !e.target.closest('.add-plan-btn') &&
+                    !e.target.closest('.add-plan-menu')) {
+                    // Trigger closing animation
+                    if (activeMenu) {
+                        setClosingMenu(activeMenu);
+                        setTimeout(() => {
+                            setActiveMenu(null);
+                            setClosingMenu(null);
+                        }, 300); // Match CSS animation duration
+                    } else {
+                        setActiveMenu(null);
+                    }
+                    setFabOpen(false);
+                    setAddPlanMenuOpen(false);
+                }
+            }}
+        >
             {/* Hidden file input for import */}
             <input
                 type="file"
@@ -728,8 +874,8 @@ const PlanningPage = () => {
                                         >
                                             ⋮
                                         </button>
-                                        {activeMenu === `plan-${plan.id}` && (
-                                            <div className="plan-dropdown">
+                                        {(activeMenu === `plan-${plan.id}` || closingMenu === `plan-${plan.id}`) && (
+                                            <div className={`plan-dropdown ${closingMenu === `plan-${plan.id}` ? 'closing' : ''}`}>
                                                 <button onClick={(e) => { e.stopPropagation(); handleStartRename(plan); }}>
                                                     ✏️ {t.renamePlan}
                                                 </button>
@@ -1139,10 +1285,22 @@ const PlanningPage = () => {
                                     {/* Saturation/Brightness gradient */}
                                     <div
                                         className="color-gradient"
+                                        ref={colorPickerRef}
                                         style={{ backgroundColor: `hsl(${colorHue}, 100%, 50%)` }}
                                         onClick={handleColorPickerClick}
                                         onMouseDown={(e) => {
-                                            const handleMove = (moveE) => handleColorPickerClick(moveE);
+                                            e.preventDefault();
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const updateColor = (moveE) => {
+                                                const x = Math.max(0, Math.min(1, (moveE.clientX - rect.left) / rect.width));
+                                                const y = Math.max(0, Math.min(1, (moveE.clientY - rect.top) / rect.height));
+                                                const saturation = x;
+                                                const brightness = 1 - y;
+                                                const rgb = hsvToRgb(colorHue, saturation, brightness);
+                                                setGroupForm(prev => ({ ...prev, color: rgb }));
+                                            };
+                                            updateColor(e); // Apply immediately on mousedown
+                                            const handleMove = (moveE) => updateColor(moveE);
                                             const handleUp = () => {
                                                 document.removeEventListener('mousemove', handleMove);
                                                 document.removeEventListener('mouseup', handleUp);
@@ -1160,7 +1318,17 @@ const PlanningPage = () => {
                                         className="hue-bar"
                                         onClick={handleHueClick}
                                         onMouseDown={(e) => {
-                                            const handleMove = (moveE) => handleHueClick(moveE);
+                                            e.preventDefault();
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const updateHue = (moveE) => {
+                                                const x = Math.max(0, Math.min(1, (moveE.clientX - rect.left) / rect.width));
+                                                const hue = x * 360;
+                                                setColorHue(hue);
+                                                const rgb = hsvToRgb(hue, 1, 1);
+                                                setGroupForm(prev => ({ ...prev, color: rgb }));
+                                            };
+                                            updateHue(e);
+                                            const handleMove = (moveE) => updateHue(moveE);
                                             const handleUp = () => {
                                                 document.removeEventListener('mousemove', handleMove);
                                                 document.removeEventListener('mouseup', handleUp);
@@ -1174,16 +1342,144 @@ const PlanningPage = () => {
                                             style={{ left: `${(colorHue / 360) * 100}%` }}
                                         ></div>
                                     </div>
-
-                                    {/* Color preview */}
+                                    {/* Color preview with editable RGB */}
                                     <div className="color-preview-row">
                                         <div
                                             className="color-preview-large"
-                                            style={{ backgroundColor: `rgb(${groupForm.color.r}, ${groupForm.color.g}, ${groupForm.color.b})` }}
+                                            style={{
+                                                background: groupForm.gradient
+                                                    ? `linear-gradient(135deg, rgb(${groupForm.gradient.start.r}, ${groupForm.gradient.start.g}, ${groupForm.gradient.start.b}), rgb(${groupForm.gradient.end.r}, ${groupForm.gradient.end.g}, ${groupForm.gradient.end.b}))`
+                                                    : `rgb(${groupForm.color.r}, ${groupForm.color.g}, ${groupForm.color.b})`
+                                            }}
                                         ></div>
-                                        <span className="color-rgb-text">
-                                            RGB({groupForm.color.r}, {groupForm.color.g}, {groupForm.color.b})
-                                        </span>
+                                        <div className="rgb-inputs">
+                                            <span className="rgb-label">R:</span>
+                                            {editingRgb === 'r' ? (
+                                                <input
+                                                    type="number"
+                                                    className="rgb-input"
+                                                    value={rgbInputValue}
+                                                    onChange={(e) => setRgbInputValue(e.target.value)}
+                                                    onBlur={handleRgbInputConfirm}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleRgbInputConfirm()}
+                                                    autoFocus
+                                                    min="0"
+                                                    max="255"
+                                                />
+                                            ) : (
+                                                <span className="rgb-value" onClick={() => handleRgbEdit('r')}>{groupForm.color.r}</span>
+                                            )}
+                                            <span className="rgb-label">G:</span>
+                                            {editingRgb === 'g' ? (
+                                                <input
+                                                    type="number"
+                                                    className="rgb-input"
+                                                    value={rgbInputValue}
+                                                    onChange={(e) => setRgbInputValue(e.target.value)}
+                                                    onBlur={handleRgbInputConfirm}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleRgbInputConfirm()}
+                                                    autoFocus
+                                                    min="0"
+                                                    max="255"
+                                                />
+                                            ) : (
+                                                <span className="rgb-value" onClick={() => handleRgbEdit('g')}>{groupForm.color.g}</span>
+                                            )}
+                                            <span className="rgb-label">B:</span>
+                                            {editingRgb === 'b' ? (
+                                                <input
+                                                    type="number"
+                                                    className="rgb-input"
+                                                    value={rgbInputValue}
+                                                    onChange={(e) => setRgbInputValue(e.target.value)}
+                                                    onBlur={handleRgbInputConfirm}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleRgbInputConfirm()}
+                                                    autoFocus
+                                                    min="0"
+                                                    max="255"
+                                                />
+                                            ) : (
+                                                <span className="rgb-value" onClick={() => handleRgbEdit('b')}>{groupForm.color.b}</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Color Palettes */}
+                                    <div className="color-palettes">
+                                        <div className="palette-section">
+                                            <span className="palette-label">Vibrant</span>
+                                            <div className="palette-swatches">
+                                                {colorPalettes.vibrant.map((color, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className="palette-swatch"
+                                                        style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
+                                                        onClick={() => setGroupForm(prev => ({ ...prev, color, gradient: null }))}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="palette-section">
+                                            <span className="palette-label">Pastel</span>
+                                            <div className="palette-swatches">
+                                                {colorPalettes.pastel.map((color, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className="palette-swatch"
+                                                        style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
+                                                        onClick={() => setGroupForm(prev => ({ ...prev, color, gradient: null }))}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="palette-section">
+                                            <span className="palette-label">Earth</span>
+                                            <div className="palette-swatches">
+                                                {colorPalettes.earth.map((color, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className="palette-swatch"
+                                                        style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
+                                                        onClick={() => setGroupForm(prev => ({ ...prev, color, gradient: null }))}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="palette-section">
+                                            <span className="palette-label">Gradient</span>
+                                            <div className="palette-swatches">
+                                                {gradientPresets.map((g, i) => (
+                                                    <div
+                                                        key={`grad-${i}`}
+                                                        className="palette-swatch gradient-swatch"
+                                                        style={{
+                                                            background: `linear-gradient(135deg, rgb(${g.start.r}, ${g.start.g}, ${g.start.b}), rgb(${g.end.r}, ${g.end.g}, ${g.end.b}))`
+                                                        }}
+                                                        onClick={() => setGroupForm(prev => ({
+                                                            ...prev,
+                                                            color: g.start,
+                                                            gradient: { start: g.start, end: g.end }
+                                                        }))}
+                                                        title={g.name}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {recentColors.length > 0 && (
+                                            <div className="palette-section">
+                                                <span className="palette-label">Recent</span>
+                                                <div className="palette-swatches">
+                                                    {recentColors.map((color, i) => (
+                                                        <div
+                                                            key={`recent-${i}`}
+                                                            className="palette-swatch"
+                                                            style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
+                                                            onClick={() => setGroupForm(prev => ({ ...prev, color, gradient: null }))}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

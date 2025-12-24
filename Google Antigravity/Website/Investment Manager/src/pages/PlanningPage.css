@@ -473,6 +473,19 @@
 
 .investment-card {
     padding: 1rem;
+    animation: cardSlideIn 0.3s ease;
+}
+
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* --- Investment Header (Row 1) --- */
@@ -559,10 +572,46 @@
 
 .investment-group {
     margin-bottom: 1rem;
-    border-left: 3px solid var(--primary-color);
+    border-left: none;
+    /* Remove static border, use pseudo-element */
     border-radius: 8px;
     overflow: visible;
     position: relative;
+}
+
+/* Animated left border - slides from top to bottom */
+.investment-group::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--group-border-color, var(--primary-color));
+    border-radius: 3px 0 0 3px;
+    transform-origin: top;
+    transform: scaleY(1);
+}
+
+/* Animate border when expanded */
+.investment-group.expanded::before {
+    animation: borderSlideDown 0.5s ease forwards;
+}
+
+/* No border visible when collapsed header only */
+.investment-group.collapsed::before {
+    transform: scaleY(1);
+    /* Keep border visible even when collapsed */
+}
+
+@keyframes borderSlideDown {
+    from {
+        transform: scaleY(0);
+    }
+
+    to {
+        transform: scaleY(1);
+    }
 }
 
 .group-header {
@@ -758,12 +807,12 @@
 }
 
 .dca-date-item:hover {
-    background: var(--primary-glow);
+    background: var(--dca-accent-light, var(--primary-glow));
 }
 
 .dca-date-item.completed {
-    background: var(--primary-glow);
-    border-color: var(--primary-color);
+    background: var(--dca-accent-light, var(--primary-glow));
+    border-color: var(--dca-accent-color, var(--primary-color));
 }
 
 .dca-date-item.completed .dca-date {
@@ -930,6 +979,38 @@
     z-index: 9999;
     overflow: hidden;
     min-width: 140px;
+    animation: slideDown 0.5s ease;
+    transform-origin: top right;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Slide out animation for closing */
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.95);
+    }
+}
+
+.dropdown-menu.closing,
+.plan-dropdown.closing {
+    animation: slideUp 0.3s ease forwards;
 }
 
 .dropdown-menu button {
@@ -1061,6 +1142,34 @@
 
 .modal.modal-lg {
     max-width: 500px;
+}
+
+/* PC: Increase modal and reduce form padding */
+@media (min-width: 768px) {
+    .modal {
+        max-height: 95vh;
+        max-width: 420px;
+        padding: 1.5rem;
+    }
+
+    .modal h3 {
+        margin-bottom: 1rem;
+    }
+
+    .form-group {
+        margin-bottom: 0.75rem;
+    }
+
+    .form-group label {
+        margin-bottom: 0.3rem;
+        font-size: 0.8rem;
+    }
+
+    .form-group input,
+    .form-group select {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
 }
 
 @keyframes slideUp {
@@ -1221,6 +1330,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    margin-top: 0.5rem;
 }
 
 .color-preview-large {
@@ -1228,12 +1338,128 @@
     height: 40px;
     border-radius: 8px;
     border: 2px solid var(--border-color);
+    flex-shrink: 0;
 }
 
-.color-rgb-text {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
+/* Editable RGB inputs */
+.rgb-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.rgb-label {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.rgb-value {
+    color: var(--primary-color);
+    font-weight: 700;
+    padding: 0.15rem 0.3rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 28px;
+    text-align: center;
+}
+
+.rgb-value:hover {
+    background: var(--primary-glow);
+}
+
+.rgb-input {
+    width: 45px;
+    padding: 0.2rem 0.3rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+    font-weight: 700;
+    color: var(--primary-color);
+    background: var(--bg-color);
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+.rgb-input::-webkit-outer-spin-button,
+.rgb-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Color Palettes */
+.color-palettes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.palette-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.palette-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    min-width: 45px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.palette-swatches {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.palette-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.palette-swatch:hover {
+    transform: scale(1.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 1;
+}
+
+/* Wider gradient swatches */
+.gradient-swatch {
+    width: 36px;
+}
+
+/* Compact color picker for PC - reduce heights */
+@media (min-width: 768px) {
+    .color-gradient {
+        height: 80px;
+    }
+
+    .color-palettes {
+        gap: 0.35rem;
+    }
+
+    .palette-swatches {
+        gap: 3px;
+    }
+
+    .palette-swatch {
+        width: 18px;
+        height: 18px;
+    }
+
+    .gradient-swatch {
+        width: 32px;
+    }
 }
 
 .percentage-slider {
@@ -1688,7 +1914,8 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 200;
     overflow: hidden;
-    animation: fadeSlideIn 0.15s ease-out;
+    animation: slideDown 0.5s ease;
+    transform-origin: top right;
 }
 
 .plan-dropdown button {
@@ -1755,7 +1982,7 @@
     border-radius: 8px;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
     overflow: hidden;
-    animation: fadeSlideUp 0.15s ease-out;
+    animation: fadeSlideUp 0.5s ease-out;
 }
 
 @keyframes fadeSlideUp {

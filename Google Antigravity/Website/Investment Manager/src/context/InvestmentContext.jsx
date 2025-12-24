@@ -269,7 +269,7 @@ export const InvestmentProvider = ({ children }) => {
         }
     }, [user, currentPlanId]);
 
-    const debouncedSave = useDebounce(savePlanToFirestore, 10000);
+    const debouncedSave = useDebounce(savePlanToFirestore, 3000);
 
     useEffect(() => {
         if (!user || !currentPlanId || isInitialLoad) return;
@@ -786,12 +786,37 @@ export const InvestmentProvider = ({ children }) => {
     // -------------------------------------------------------------------------
     // INVESTMENT COST CALCULATION
     // -------------------------------------------------------------------------
-    const calculateInvestmentCost = (investment, availableBalances, originalTotalTHB) => {
+
+    /**
+     * Get cumulative percentage multiplier for an investment based on its group hierarchy
+     * For nested groups: Total × ParentGroup% × ChildGroup% × Investment%
+     * Returns a value between 0 and 1 (e.g., 0.5 for 50%)
+     */
+    const getGroupPercentageMultiplier = (groupId) => {
+        if (!groupId) return 1; // Ungrouped investments use 100% of total
+
+        let multiplier = 1;
+        let currentGroupId = groupId;
+
+        // Walk up the group hierarchy, multiplying percentages
+        while (currentGroupId) {
+            const group = groups.find(g => g.id === currentGroupId);
+            if (!group) break;
+
+            const groupPercentage = Number(group.percentage) || 100;
+            multiplier *= (groupPercentage / 100);
+            currentGroupId = group.parentGroupId;
+        }
+
+        return multiplier;
+    };
+
+    const calculateInvestmentCost = (investment, availableBalances, baseTHB) => {
         const percentage = Number(investment.percentage) || 0;
         if (percentage <= 0) return { costs: {}, couldFullyAllocate: true };
-        if (originalTotalTHB <= 0) return { costs: {}, couldFullyAllocate: percentage === 0 };
+        if (baseTHB <= 0) return { costs: {}, couldFullyAllocate: percentage === 0 };
 
-        const neededTHB = (percentage / 100) * originalTotalTHB;
+        const neededTHB = (percentage / 100) * baseTHB;
         let remainingNeededTHB = neededTHB;
         const costs = {};
 
@@ -833,13 +858,18 @@ export const InvestmentProvider = ({ children }) => {
         const allocationStatus = {};
 
         investments.forEach(inv => {
-            const result = calculateInvestmentCost(inv, availableBalances, originalTotalTHB);
+            // Get the group-adjusted base amount
+            // For grouped investments: Total × Group1% × Group2% (cumulative)
+            const groupMultiplier = getGroupPercentageMultiplier(inv.groupId);
+            const adjustedBaseTHB = originalTotalTHB * groupMultiplier;
+
+            const result = calculateInvestmentCost(inv, availableBalances, adjustedBaseTHB);
             costs[inv.id] = result.costs;
             allocationStatus[inv.id] = result.couldFullyAllocate;
         });
 
         return { costs, allocationStatus };
-    }, [accounts, investments, exchangeRate]);
+    }, [accounts, investments, groups, exchangeRate]);
 
     const calculatedCosts = calculatedData.costs;
 
