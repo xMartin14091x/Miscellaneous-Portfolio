@@ -10,8 +10,13 @@ InvestMan! helps investors:
 1. **Track currency accounts** (THB & USD) with automatic exchange rate conversion
 2. **Plan investment allocations** as percentages of total funds
 3. **Schedule DCA (Dollar Cost Averaging)** with date tracking and completion checkboxes
-4. **Sync data across devices** via Firebase Firestore (auto-save, real-time)
+4. **Sync data across devices** via Firebase Firestore (auto-save with 3s debounce)
 5. **Authenticate** via Email/Password, Phone OTP, or Google Sign-In
+6. **Organize with groups** - Create colored/gradient investment groups with nested subgroups
+7. **Multiple plans** - Create and switch between different investment strategies
+8. **Drag-and-drop** - Reorder plans, accounts, groups, and investments
+9. **Dynamic theming** - Investment cards and DCA elements adapt to group color
+10. **Smooth animations** - Slide-in/out dropdowns, card animations, and group border animations
 
 ---
 

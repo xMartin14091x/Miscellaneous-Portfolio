@@ -1,31 +1,22 @@
 /**
- * InvestmentContext.jsx - Investment Data Management & Firestore Sync
+ * InvestmentContext.jsx - Investment Data Management & Multi-Plan Support
  * 
  * This is the core state management for the investment planning features.
  * It handles:
- * 1. Currency accounts (THB/USD) with amounts
- * 2. Investment allocations with percentage-based calculations
- * 3. DCA (Dollar Cost Averaging) schedules with completion tracking
- * 4. Real-time sync with Firebase Firestore
+ * 1. Multiple investment plans with sidebar management
+ * 2. Currency accounts (THB/USD) with amounts
+ * 3. Investment allocations with percentage-based calculations
+ * 4. DCA (Dollar Cost Averaging) schedules with completion tracking
+ * 5. Real-time sync with Firebase Firestore
+ * 6. Export to CSV/TXT
  * 
- * Key Features:
- * - Auto-save: Changes are saved 1 second after the last edit (debounced)
- * - Smart save: Only saves if data actually changed
- * - Real-time sync: Uses Firestore onSnapshot for cross-device sync
- * - Offline support: Works offline, syncs when back online
- * 
- * Data Flow:
- * 1. User logs in → loads data from Firestore
- * 2. User makes changes → local state updates immediately
- * 3. After 1 second of no changes → saves to Firestore
- * 4. Other devices receive update via onSnapshot
- * 
- * Usage:
- *   const { accounts, addAccount, investments, isLoading } = useInvestment();
+ * Data Structure in Firestore:
+ * users/{userId}/plans/{planId}/
+ *   - name, exchangeRate, accounts, investments, createdAt, updatedAt
  */
 
 import { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, collection, getDocs, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 
@@ -34,7 +25,6 @@ const InvestmentContext = createContext();
 
 /**
  * Custom hook to access investment state and methods
- * Must be used within an InvestmentProvider
  */
 export const useInvestment = () => {
     const context = useContext(InvestmentContext);
@@ -48,32 +38,19 @@ export const useInvestment = () => {
 // HELPER FUNCTIONS
 // =============================================================================
 
-/**
- * Custom hook for debouncing function calls
- * Used to delay saving to Firestore until user stops making changes
- * 
- * @param {Function} callback - Function to call after delay
- * @param {number} delay - Delay in milliseconds
- */
 const useDebounce = (callback, delay) => {
-    const timeoutRef = useState(null);
+    const timeoutRef = useRef(null);
 
     return useCallback((...args) => {
-        // Clear any existing timeout
-        if (timeoutRef[0]) {
-            clearTimeout(timeoutRef[0]);
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
         }
-        // Set new timeout
-        timeoutRef[0] = setTimeout(() => {
+        timeoutRef.current = setTimeout(() => {
             callback(...args);
         }, delay);
     }, [callback, delay]);
 };
 
-/**
- * Deep comparison of two objects using JSON serialization
- * Used to check if data has actually changed before saving
- */
 const isEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // =============================================================================
@@ -81,173 +58,729 @@ const isEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // =============================================================================
 
 export const InvestmentProvider = ({ children }) => {
-    // Get current user from auth context
     const { user } = useAuth();
 
     // -------------------------------------------------------------------------
-    // STATE
+    // PLANS STATE
     // -------------------------------------------------------------------------
+    const [plans, setPlans] = useState([]);  // Array of { id, name, createdAt }
+    const [currentPlanId, setCurrentPlanId] = useState(null);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
 
-    // Exchange rate: How many THB per 1 USD (default: 32)
+    // -------------------------------------------------------------------------
+    // CURRENT PLAN DATA STATE
+    // -------------------------------------------------------------------------
     const [exchangeRate, setExchangeRate] = useState(32);
-
-    // Currency accounts - array of { id, name, currency, amount }
     const [accounts, setAccounts] = useState([]);
-
-    // Investments - array of investment objects (see data model below)
     const [investments, setInvestments] = useState([]);
+    const [groups, setGroups] = useState([]); // Hierarchical investment groups
 
-    // Loading state: true while fetching data from Firestore
+    // -------------------------------------------------------------------------
+    // LOADING STATES
+    // -------------------------------------------------------------------------
     const [isLoading, setIsLoading] = useState(true);
-
-    // Syncing state: true while saving to Firestore
     const [isSyncing, setIsSyncing] = useState(false);
-
-    // Last successful sync timestamp
     const [lastSyncTime, setLastSyncTime] = useState(null);
-
-    // Flag to prevent saving during initial data load
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-    // Ref to track last saved data (for change detection)
-    const lastSavedData = useRef({ exchangeRate: 32, accounts: [], investments: [] });
+    const lastSavedData = useRef({ exchangeRate: 32, accounts: [], investments: [], groups: [] });
 
     // -------------------------------------------------------------------------
-    // FIRESTORE SYNC
+    // SIDEBAR TOGGLE
     // -------------------------------------------------------------------------
+    const toggleSidebar = () => setSidebarOpen(prev => !prev);
 
-    /**
-     * Save data to Firestore
-     * Only saves if data has actually changed from last save
-     */
-    const saveToFirestore = useCallback(async (data) => {
-        if (!user) return;
+    // -------------------------------------------------------------------------
+    // DATA MIGRATION - Check for old data structure and migrate
+    // -------------------------------------------------------------------------
+    const migrateOldData = useCallback(async () => {
+        if (!user) return false;
 
-        // Check if data actually changed - skip save if identical
-        if (isEqual(data, lastSavedData.current)) {
-            console.log('No changes detected, skipping save');
-            return;
-        }
-
-        setIsSyncing(true);
         try {
-            // Save to users/{userId} document
-            const userDocRef = doc(db, 'users', user.uid);
-            await setDoc(userDocRef, {
-                exchangeRate: data.exchangeRate,
-                accounts: data.accounts,
-                investments: data.investments,
-                updatedAt: new Date().toISOString()
-            }, { merge: true });  // merge: true keeps other fields
+            const oldDataRef = doc(db, 'users', user.uid);
+            const oldDataSnap = await getDoc(oldDataRef);
 
-            // Update reference to track what was saved
-            lastSavedData.current = { ...data };
-            setLastSyncTime(new Date());
-            console.log('Data saved to Firestore');
+            if (oldDataSnap.exists()) {
+                const oldData = oldDataSnap.data();
+
+                // Check if this is old structure (has accounts/investments directly on user doc)
+                if (oldData.accounts || oldData.investments) {
+                    console.log('Migrating old data to new plan structure...');
+
+                    // Create a new plan with the old data
+                    const newPlanId = Date.now().toString();
+                    const planRef = doc(db, 'users', user.uid, 'plans', newPlanId);
+
+                    await setDoc(planRef, {
+                        name: 'My Plan',
+                        exchangeRate: oldData.exchangeRate || 32,
+                        accounts: oldData.accounts || [],
+                        investments: oldData.investments || [],
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    });
+
+                    // Remove old data from user doc (keep preferences if any)
+                    await setDoc(oldDataRef, {
+                        migratedToPlans: true,
+                        migratedAt: new Date().toISOString()
+                    }, { merge: true });
+
+                    // Delete old fields
+                    const { accounts: _, investments: __, exchangeRate: ___, ...rest } = oldData;
+                    await setDoc(oldDataRef, { ...rest, migratedToPlans: true });
+
+                    console.log('Migration complete!');
+                    return true;
+                }
+            }
+            return false;
         } catch (error) {
-            console.error('Error saving to Firestore:', error);
-        } finally {
-            setIsSyncing(false);
+            console.error('Error migrating old data:', error);
+            return false;
         }
     }, [user]);
 
-    // Create debounced version - saves 1 second after last change
-    const debouncedSave = useDebounce(saveToFirestore, 1000);
-
-    /**
-     * Effect: Auto-save when data changes
-     * Triggers after any change to accounts, investments, or exchange rate
-     * Skipped during initial load to prevent echo saves
-     */
-    useEffect(() => {
-        if (!user || isInitialLoad) return;
-
-        const currentData = { exchangeRate, accounts, investments };
-
-        // Only trigger save if data actually changed
-        if (!isEqual(currentData, lastSavedData.current)) {
-            debouncedSave(currentData);
-        }
-    }, [exchangeRate, accounts, investments, user, isInitialLoad, debouncedSave]);
-
-    /**
-     * Effect: Load data from Firestore when user logs in
-     * Uses onSnapshot for real-time updates (cross-device sync)
-     */
+    // -------------------------------------------------------------------------
+    // LOAD PLANS LIST
+    // -------------------------------------------------------------------------
     useEffect(() => {
         if (!user) {
-            // User logged out - clear all data
+            setPlans([]);
+            setCurrentPlanId(null);
             setAccounts([]);
             setInvestments([]);
             setExchangeRate(32);
             setIsLoading(false);
+            return;
+        }
+
+        const loadPlans = async () => {
+            setIsLoading(true);
+
+            // First, check for and migrate old data if needed
+            await migrateOldData();
+
+            // Load all plans
+            const plansRef = collection(db, 'users', user.uid, 'plans');
+            const plansQuery = query(plansRef, orderBy('createdAt', 'asc'));
+
+            const unsubscribe = onSnapshot(plansQuery, (snapshot) => {
+                const plansList = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    name: doc.data().name,
+                    createdAt: doc.data().createdAt
+                }));
+
+                setPlans(plansList);
+
+                // If no current plan selected and we have plans, select the first one
+                if (!currentPlanId && plansList.length > 0) {
+                    setCurrentPlanId(plansList[0].id);
+                }
+
+                setIsLoading(false);
+            }, (error) => {
+                console.error('Error loading plans:', error);
+                setIsLoading(false);
+            });
+
+            return unsubscribe;
+        };
+
+        const unsubscribePromise = loadPlans();
+
+        return () => {
+            unsubscribePromise.then(unsub => unsub && unsub());
+        };
+    }, [user, migrateOldData]);
+
+    // -------------------------------------------------------------------------
+    // LOAD CURRENT PLAN DATA
+    // -------------------------------------------------------------------------
+    useEffect(() => {
+        if (!user || !currentPlanId) {
+            setAccounts([]);
+            setInvestments([]);
+            setExchangeRate(32);
             setIsInitialLoad(true);
             return;
         }
 
         setIsLoading(true);
-        const userDocRef = doc(db, 'users', user.uid);
+        const planRef = doc(db, 'users', user.uid, 'plans', currentPlanId);
 
-        // Set up real-time listener - fires on initial load AND on any changes
-        const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        const unsubscribe = onSnapshot(planRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                console.log('Loaded data from Firestore:', data);
 
-                // Update state with loaded data
-                if (data.exchangeRate !== undefined) {
-                    setExchangeRate(data.exchangeRate);
-                }
-                if (data.accounts) {
-                    setAccounts(data.accounts);
-                }
-                if (data.investments) {
-                    setInvestments(data.investments);
-                }
+                if (data.exchangeRate !== undefined) setExchangeRate(data.exchangeRate);
+                if (data.accounts) setAccounts(data.accounts);
+                if (data.investments) setInvestments(data.investments);
+                // Always set groups - default to empty array if not present
+                setGroups(data.groups ?? []);
 
-                // Update lastSavedData to match (prevents unnecessary re-saves)
                 lastSavedData.current = {
                     exchangeRate: data.exchangeRate ?? 32,
                     accounts: data.accounts ?? [],
-                    investments: data.investments ?? []
+                    investments: data.investments ?? [],
+                    groups: data.groups ?? []
                 };
-            } else {
-                console.log('No existing data in Firestore, starting fresh');
-                lastSavedData.current = { exchangeRate: 32, accounts: [], investments: [] };
             }
 
             setIsLoading(false);
-            // Brief delay before enabling saves to prevent echo
             setTimeout(() => setIsInitialLoad(false), 100);
         }, (error) => {
-            console.error('Error loading from Firestore:', error);
+            console.error('Error loading plan data:', error);
             setIsLoading(false);
             setIsInitialLoad(false);
         });
 
-        // Cleanup: unsubscribe when user changes or component unmounts
         return () => unsubscribe();
-    }, [user]);
+    }, [user, currentPlanId]);
+
+    // -------------------------------------------------------------------------
+    // SAVE CURRENT PLAN DATA
+    // -------------------------------------------------------------------------
+    const savePlanToFirestore = useCallback(async (data) => {
+        if (!user || !currentPlanId) return;
+
+        if (isEqual(data, lastSavedData.current)) {
+            return;
+        }
+
+        setIsSyncing(true);
+        try {
+            const planRef = doc(db, 'users', user.uid, 'plans', currentPlanId);
+            await setDoc(planRef, {
+                exchangeRate: data.exchangeRate,
+                accounts: data.accounts,
+                investments: data.investments,
+                groups: data.groups ?? [],
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+
+            lastSavedData.current = { ...data };
+            setLastSyncTime(new Date());
+        } catch (error) {
+            console.error('Error saving plan:', error);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [user, currentPlanId]);
+
+    const debouncedSave = useDebounce(savePlanToFirestore, 3000);
+
+    useEffect(() => {
+        if (!user || !currentPlanId || isInitialLoad) return;
+
+        const currentData = { exchangeRate, accounts, investments, groups };
+        if (!isEqual(currentData, lastSavedData.current)) {
+            debouncedSave(currentData);
+        }
+    }, [exchangeRate, accounts, investments, groups, user, currentPlanId, isInitialLoad, debouncedSave]);
+
+    // -------------------------------------------------------------------------
+    // PLAN CRUD OPERATIONS
+    // -------------------------------------------------------------------------
+    const createPlan = async (name = 'Untitled Plan') => {
+        if (!user) return null;
+
+        try {
+            const newPlanId = Date.now().toString();
+            const planRef = doc(db, 'users', user.uid, 'plans', newPlanId);
+
+            await setDoc(planRef, {
+                name,
+                exchangeRate: 32,
+                accounts: [],
+                investments: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+
+            setCurrentPlanId(newPlanId);
+            return newPlanId;
+        } catch (error) {
+            console.error('Error creating plan:', error);
+            return null;
+        }
+    };
+
+    const renamePlan = async (planId, newName) => {
+        if (!user || !planId) return false;
+
+        try {
+            const planRef = doc(db, 'users', user.uid, 'plans', planId);
+            await setDoc(planRef, { name: newName, updatedAt: new Date().toISOString() }, { merge: true });
+            return true;
+        } catch (error) {
+            console.error('Error renaming plan:', error);
+            return false;
+        }
+    };
+
+    const deletePlan = async (planId) => {
+        if (!user || !planId) return false;
+
+        try {
+            const planRef = doc(db, 'users', user.uid, 'plans', planId);
+            await deleteDoc(planRef);
+
+            // If we deleted the current plan, switch to another
+            if (currentPlanId === planId) {
+                const remainingPlans = plans.filter(p => p.id !== planId);
+                setCurrentPlanId(remainingPlans.length > 0 ? remainingPlans[0].id : null);
+            }
+            return true;
+        } catch (error) {
+            console.error('Error deleting plan:', error);
+            return false;
+        }
+    };
+
+    /**
+     * Reorder plans in sidebar
+     */
+    const reorderPlans = async (fromIndex, toIndex) => {
+        if (!user || fromIndex === toIndex) return;
+
+        const newPlans = [...plans];
+        const [movedPlan] = newPlans.splice(fromIndex, 1);
+        newPlans.splice(toIndex, 0, movedPlan);
+
+        // Update order field for all plans
+        try {
+            const batch = [];
+            newPlans.forEach((plan, index) => {
+                const planRef = doc(db, 'users', user.uid, 'plans', plan.id);
+                batch.push(setDoc(planRef, { order: index }, { merge: true }));
+            });
+            await Promise.all(batch);
+        } catch (error) {
+            console.error('Error reordering plans:', error);
+        }
+    };
+
+    /**
+     * Reorder groups at the same parent level
+     */
+    const reorderGroups = (parentGroupId, fromIndex, toIndex) => {
+        if (fromIndex === toIndex) return;
+
+        // Get siblings (groups with same parent)
+        const siblings = groups.filter(g => g.parentGroupId === parentGroupId);
+        const others = groups.filter(g => g.parentGroupId !== parentGroupId);
+
+        const [movedGroup] = siblings.splice(fromIndex, 1);
+        siblings.splice(toIndex, 0, movedGroup);
+
+        setGroups([...others, ...siblings]);
+    };
+
+    /**
+     * Reorder investments within same group (or ungrouped)
+     */
+    const reorderInvestments = (groupId, fromIndex, toIndex) => {
+        if (fromIndex === toIndex) return;
+
+        // Get investments in this group
+        const inGroup = investments.filter(inv => inv.groupId === groupId);
+        const others = investments.filter(inv => inv.groupId !== groupId);
+
+        const [movedInv] = inGroup.splice(fromIndex, 1);
+        inGroup.splice(toIndex, 0, movedInv);
+
+        setInvestments([...others, ...inGroup]);
+    };
+
+    /**
+     * Reorder accounts
+     */
+    const reorderAccounts = (fromIndex, toIndex) => {
+        if (fromIndex === toIndex) return;
+
+        const newAccounts = [...accounts];
+        const [movedAccount] = newAccounts.splice(fromIndex, 1);
+        newAccounts.splice(toIndex, 0, movedAccount);
+
+        setAccounts(newAccounts);
+    };
+
+    const switchPlan = (planId) => {
+        if (planId && plans.some(p => p.id === planId)) {
+            setIsInitialLoad(true);
+            setCurrentPlanId(planId);
+        }
+    };
+
+    // -------------------------------------------------------------------------
+    // EXPORT FUNCTIONS
+    // -------------------------------------------------------------------------
+    const exportPlanCSV = () => {
+        const currentPlan = plans.find(p => p.id === currentPlanId);
+        const planName = currentPlan?.name || 'plan';
+
+        let csv = 'type,name,currency,amount,percentage,accountPriority,dcaType,dcaStartDate,dcaEndDate\n';
+
+        accounts.forEach(acc => {
+            csv += `account,"${acc.name}",${acc.currency},${acc.amount},,,,\n`;
+        });
+
+        investments.forEach(inv => {
+            const priority = (inv.accountPriority || []).join('|');
+            csv += `investment,"${inv.name}",,${inv.percentage},"${priority}",${inv.dcaType || ''},${inv.dcaStartDate || ''},${inv.dcaEndDate || ''}\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${planName.replace(/[^a-z0-9]/gi, '_')}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    /**
+     * Exports plan as hierarchical TXT with groups, percentages, and DCA progress
+     * Format shows: total funds, accounts, then hierarchical groups/investments
+     */
+    const exportPlanTXT = () => {
+        const currentPlan = plans.find(p => p.id === currentPlanId);
+        const planName = currentPlan?.name || 'plan';
+
+        // Calculate total funds in THB
+        const totalFundsTHB = accounts.reduce((sum, acc) => {
+            if (acc.currency === 'THB') return sum + acc.amount;
+            return sum + (acc.amount * exchangeRate);
+        }, 0);
+
+        // Helper to format DCA progress as "|" marks
+        const formatDcaProgress = (investmentId) => {
+            const inv = investments.find(i => i.id === investmentId);
+            if (!inv?.dcaEndDate) return '';
+            const schedule = generateDcaSchedule(inv);
+            const completed = schedule.filter(s => s.completed).length;
+            const bars = '|'.repeat(completed);
+            const remaining = schedule.length - completed;
+            if (remaining > 0) return ` | ${bars}`;
+            return ` | ${bars}`;
+        };
+
+        // Helper to check if all investments are completed
+        const isGroupCompleted = (groupId) => {
+            const groupInvs = getGroupInvestments(groupId);
+            const childGroups = getChildGroups(groupId);
+
+            // Check investments
+            for (const inv of groupInvs) {
+                if (!inv.dcaEndDate) continue;
+                const schedule = generateDcaSchedule(inv);
+                if (schedule.some(s => !s.completed)) return null;
+            }
+
+            // Check child groups
+            for (const child of childGroups) {
+                if (!isGroupCompleted(child.id)) return null;
+            }
+
+            // Return latest end date
+            let latestDate = null;
+            groupInvs.forEach(inv => {
+                if (inv.dcaEndDate && (!latestDate || inv.dcaEndDate > latestDate)) {
+                    latestDate = inv.dcaEndDate;
+                }
+            });
+            return latestDate;
+        };
+
+        // Helper to format date as DD/MM/YYYY
+        const formatDate = (dateStr) => {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        };
+
+        // Helper to render investments
+        const renderInvestment = (inv, indent, groupFund) => {
+            const cost = groupFund * (inv.percentage / 100);
+            const dcaCount = inv.dcaEndDate ? generateDcaSchedule(inv).length : 1;
+            const perDca = cost / dcaCount;
+            const currency = accounts.find(a => inv.accountPriority?.includes(a.id))?.currency || 'THB';
+            const symbol = currency === 'THB' ? '฿' : '$';
+            const displayCost = currency === 'USD' ? cost / exchangeRate : cost;
+            const displayPerDca = currency === 'USD' ? perDca / exchangeRate : perDca;
+            const dcaProgress = formatDcaProgress(inv.id);
+
+            let line = `${indent}${inv.name}: ${symbol}${displayCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} (${inv.percentage}%)`;
+            if (dcaCount > 1) {
+                line += ` ${symbol}${displayPerDca.toLocaleString(undefined, { maximumFractionDigits: 2 })} x ${dcaCount}`;
+            }
+            line += dcaProgress;
+            return line + '\n';
+        };
+
+        // Recursive helper to render groups
+        const renderGroup = (group, indent = '') => {
+            const groupFund = getGroupFundAmount(group.id);
+            const completedDate = isGroupCompleted(group.id);
+            const childGroups = getChildGroups(group.id);
+            const groupInvs = getGroupInvestments(group.id);
+
+            let txt = `${indent}${group.name}: ฿${groupFund.toLocaleString(undefined, { maximumFractionDigits: 0 })} (${group.percentage}%)`;
+            if (completedDate) {
+                txt += ` -- Completed ${formatDate(completedDate)}`;
+            }
+            txt += '\n';
+
+            // Render investments in this group
+            groupInvs.forEach(inv => {
+                txt += renderInvestment(inv, indent + '    ', groupFund);
+            });
+
+            // Render child groups
+            childGroups.forEach(child => {
+                txt += renderGroup(child, indent + '    ');
+            });
+
+            return txt;
+        };
+
+        // Build TXT content
+        let txt = '';
+
+        // Header: Total funds
+        txt += `฿${totalFundsTHB.toLocaleString(undefined, { maximumFractionDigits: 2 })} (100%)\n\n`;
+
+        // Accounts section with exchange rate
+        txt += '--- ACCOUNTS ---\n';
+        txt += `Exchange Rate: ${exchangeRate}THB / 1USD\n`;
+        accounts.forEach(acc => {
+            const symbol = acc.currency === 'THB' ? '฿' : '$';
+            const thbValue = acc.currency === 'THB' ? acc.amount : acc.amount * exchangeRate;
+            const usdValue = acc.currency === 'USD' ? acc.amount : acc.amount / exchangeRate;
+            const percentage = ((thbValue / totalFundsTHB) * 100).toFixed(1);
+
+            if (acc.currency === 'THB') {
+                txt += `${acc.name} (${acc.currency}): ฿${acc.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ($${usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}) [${percentage}%]\n`;
+            } else {
+                txt += `${acc.name} (${acc.currency}): $${acc.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} (฿${thbValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}) [${percentage}%]\n`;
+            }
+        });
+        txt += '\n';
+
+        // Investments section
+        txt += '--- INVESTMENTS ---\n';
+
+        // Root groups
+        const rootGroups = getRootGroups();
+        rootGroups.forEach(group => {
+            txt += renderGroup(group, '');
+            txt += '\n';
+        });
+
+        // Ungrouped investments
+        const ungroupedInvs = getUngroupedInvestments();
+        if (ungroupedInvs.length > 0) {
+            if (rootGroups.length > 0) {
+                txt += '--- UNGROUPED ---\n';
+            }
+            ungroupedInvs.forEach(inv => {
+                txt += renderInvestment(inv, '', totalFundsTHB);
+            });
+        }
+
+        // Download
+        const blob = new Blob([txt], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${planName.replace(/[^a-z0-9]/gi, '_')}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const importPlan = async (file) => {
+        if (!user || !file) return false;
+
+        try {
+            const text = await file.text();
+            const lines = text.split('\n').filter(line => line.trim());
+
+            const newAccounts = [];
+            const newInvestments = [];
+            let newExchangeRate = 32;
+
+            // Parse CSV
+            if (file.name.endsWith('.csv')) {
+                lines.slice(1).forEach(line => {
+                    const parts = line.split(',').map(p => p.replace(/"/g, '').trim());
+                    const [type, name, currency, amount, percentage, accountPriority, dcaType, dcaStartDate, dcaEndDate] = parts;
+
+                    if (type === 'account') {
+                        newAccounts.push({
+                            id: Date.now() + Math.random(),
+                            name,
+                            currency,
+                            amount: parseFloat(amount) || 0
+                        });
+                    } else if (type === 'investment') {
+                        newInvestments.push({
+                            id: Date.now() + Math.random(),
+                            name,
+                            percentage: parseFloat(percentage) || 0,
+                            accountPriority: accountPriority ? accountPriority.split('|') : [],
+                            dcaType: dcaType || 'monthly',
+                            dcaStartDate: dcaStartDate || null,
+                            dcaEndDate: dcaEndDate || null,
+                            dcaHistory: []
+                        });
+                    }
+                });
+            }
+
+            // Create new plan with imported data
+            const planName = file.name.replace(/\.(csv|txt)$/i, '');
+            const newPlanId = Date.now().toString();
+            const planRef = doc(db, 'users', user.uid, 'plans', newPlanId);
+
+            await setDoc(planRef, {
+                name: planName,
+                exchangeRate: newExchangeRate,
+                accounts: newAccounts,
+                investments: newInvestments,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+
+            setCurrentPlanId(newPlanId);
+            return true;
+        } catch (error) {
+            console.error('Error importing plan:', error);
+            return false;
+        }
+    };
+
+    // -------------------------------------------------------------------------
+    // GROUP CRUD OPERATIONS
+    // -------------------------------------------------------------------------
+    const addGroup = (group) => {
+        const newGroup = {
+            id: Date.now().toString(),
+            name: group.name || 'New Group',
+            color: group.color || { r: 34, g: 197, b: 94 }, // Default green
+            percentage: group.percentage || 100,
+            parentGroupId: group.parentGroupId || null,
+            createdAt: new Date().toISOString()
+        };
+        setGroups(prev => [...prev, newGroup]);
+        return newGroup.id;
+    };
+
+    const updateGroup = (id, updates) => {
+        setGroups(prev => prev.map(g =>
+            g.id === id ? { ...g, ...updates, updatedAt: new Date().toISOString() } : g
+        ));
+    };
+
+    const removeGroup = (id) => {
+        // Move all investments in this group to parent or ungrouped
+        const group = groups.find(g => g.id === id);
+        const parentId = group?.parentGroupId || null;
+
+        // Move investments to parent group
+        setInvestments(prev => prev.map(inv =>
+            inv.groupId === id ? { ...inv, groupId: parentId } : inv
+        ));
+
+        // Move child groups to parent
+        setGroups(prev => prev.map(g =>
+            g.parentGroupId === id ? { ...g, parentGroupId: parentId } : g
+        ));
+
+        // Remove the group
+        setGroups(prev => prev.filter(g => g.id !== id));
+    };
+
+    const moveInvestmentToGroup = (investmentId, groupId) => {
+        setInvestments(prev => prev.map(inv =>
+            inv.id === investmentId ? { ...inv, groupId: groupId || null } : inv
+        ));
+    };
+
+    // -------------------------------------------------------------------------
+    // GROUP FUND CALCULATION
+    // -------------------------------------------------------------------------
+    /**
+     * Calculate the available fund amount for a group (in THB).
+     * Accounts for parent group percentages recursively.
+     */
+    const getGroupFundAmount = useCallback((groupId) => {
+        // Calculate total funds in THB
+        const totalTHB = accounts.reduce((sum, acc) => sum + toTHB(acc.amount, acc.currency), 0);
+
+        if (!groupId) return totalTHB; // Ungrouped uses full amount
+
+        // Build the chain of parent groups
+        const getGroupChain = (gId) => {
+            const group = groups.find(g => g.id === gId);
+            if (!group) return [];
+            if (group.parentGroupId) {
+                return [...getGroupChain(group.parentGroupId), group];
+            }
+            return [group];
+        };
+
+        const chain = getGroupChain(groupId);
+
+        // Multiply percentages through the chain
+        let availableFund = totalTHB;
+        for (const group of chain) {
+            availableFund = availableFund * ((group.percentage || 100) / 100);
+        }
+
+        return availableFund;
+    }, [accounts, groups]);
+
+    /**
+     * Get root-level groups (no parent)
+     */
+    const getRootGroups = useCallback(() => {
+        return groups.filter(g => !g.parentGroupId);
+    }, [groups]);
+
+    /**
+     * Get child groups of a parent
+     */
+    const getChildGroups = useCallback((parentId) => {
+        return groups.filter(g => g.parentGroupId === parentId);
+    }, [groups]);
+
+    /**
+     * Get investments in a specific group
+     */
+    const getGroupInvestments = useCallback((groupId) => {
+        return investments.filter(inv => inv.groupId === groupId);
+    }, [investments]);
+
+    /**
+     * Get ungrouped investments
+     */
+    const getUngroupedInvestments = useCallback(() => {
+        return investments.filter(inv => !inv.groupId);
+    }, [investments]);
 
     // -------------------------------------------------------------------------
     // CURRENCY CONVERSION
     // -------------------------------------------------------------------------
-
-    /**
-     * Convert amount to THB (base currency for calculations)
-     * All internal calculations use THB for consistency
-     */
     const toTHB = (amount, currency) => {
         if (currency === 'THB') return amount;
-        return amount * exchangeRate; // USD to THB
+        return amount * exchangeRate;
     };
 
-    /**
-     * Convert THB back to original currency for display
-     */
     const fromTHB = (thbAmount, currency) => {
         if (currency === 'THB') return thbAmount;
-        return thbAmount / exchangeRate; // THB to USD
+        return thbAmount / exchangeRate;
     };
 
     // -------------------------------------------------------------------------
@@ -255,35 +788,40 @@ export const InvestmentProvider = ({ children }) => {
     // -------------------------------------------------------------------------
 
     /**
-     * Calculate cost allocation for a single investment
-     * 
-     * Logic:
-     * 1. Calculate needed amount = percentage × total funds (in THB)
-     * 2. Allocate from accounts in priority order
-     * 3. If account A has enough, take from A only
-     * 4. If not, take what A has, then continue to B, etc.
-     * 
-     * @param {Object} investment - The investment to calculate
-     * @param {Object} availableBalances - Map of accountId → available amount
-     * @param {number} originalTotalTHB - Total funds in THB
-     * @returns {{ costs: Object, couldFullyAllocate: boolean }}
+     * Get cumulative percentage multiplier for an investment based on its group hierarchy
+     * For nested groups: Total × ParentGroup% × ChildGroup% × Investment%
+     * Returns a value between 0 and 1 (e.g., 0.5 for 50%)
      */
-    const calculateInvestmentCost = (investment, availableBalances, originalTotalTHB) => {
-        const percentage = Number(investment.percentage) || 0;
-        if (percentage <= 0) return { costs: {}, couldFullyAllocate: true };
+    const getGroupPercentageMultiplier = (groupId) => {
+        if (!groupId) return 1; // Ungrouped investments use 100% of total
 
-        if (originalTotalTHB <= 0) {
-            return { costs: {}, couldFullyAllocate: percentage === 0 };
+        let multiplier = 1;
+        let currentGroupId = groupId;
+
+        // Walk up the group hierarchy, multiplying percentages
+        while (currentGroupId) {
+            const group = groups.find(g => g.id === currentGroupId);
+            if (!group) break;
+
+            const groupPercentage = Number(group.percentage) || 100;
+            multiplier *= (groupPercentage / 100);
+            currentGroupId = group.parentGroupId;
         }
 
-        // How much do we need in THB?
-        const neededTHB = (percentage / 100) * originalTotalTHB;
-        let remainingNeededTHB = neededTHB;
-        const costs = {};  // Will store accountId → amount allocated
+        return multiplier;
+    };
 
-        // Allocate from accounts in priority order
+    const calculateInvestmentCost = (investment, availableBalances, baseTHB) => {
+        const percentage = Number(investment.percentage) || 0;
+        if (percentage <= 0) return { costs: {}, couldFullyAllocate: true };
+        if (baseTHB <= 0) return { costs: {}, couldFullyAllocate: percentage === 0 };
+
+        const neededTHB = (percentage / 100) * baseTHB;
+        let remainingNeededTHB = neededTHB;
+        const costs = {};
+
         for (const accountId of (investment.accountPriority || [])) {
-            if (remainingNeededTHB <= 0.01) break;  // Small tolerance for floating point
+            if (remainingNeededTHB <= 0.01) break;
 
             const account = accounts.find(a => a.id === accountId);
             if (!account) continue;
@@ -291,13 +829,8 @@ export const InvestmentProvider = ({ children }) => {
             const available = availableBalances[accountId] || 0;
             if (available <= 0) continue;
 
-            // Convert available balance to THB for comparison
             const availableTHB = toTHB(available, account.currency);
-
-            // Take the minimum of what we need and what's available
             const allocateTHB = Math.min(remainingNeededTHB, availableTHB);
-
-            // Convert back to account's currency for storage/display
             const allocateInCurrency = fromTHB(allocateTHB, account.currency);
 
             if (allocateInCurrency > 0) {
@@ -307,60 +840,44 @@ export const InvestmentProvider = ({ children }) => {
             }
         }
 
-        // Check if we could allocate the full amount
-        const couldFullyAllocate = remainingNeededTHB < 0.01;
-        return { costs, couldFullyAllocate };
+        return { costs, couldFullyAllocate: remainingNeededTHB < 0.01 };
     };
 
-    /**
-     * Memoized calculation of all investment costs
-     * Recalculates when accounts, investments, or exchange rate changes
-     */
     const calculatedData = useMemo(() => {
-        // Step 1: Calculate total funds in THB
         let originalTotalTHB = 0;
         accounts.forEach(acc => {
             originalTotalTHB += toTHB(acc.amount, acc.currency);
         });
 
-        // Step 2: Start with full balances for each account
         const availableBalances = {};
         accounts.forEach(acc => {
             availableBalances[acc.id] = acc.amount;
         });
 
-        // Step 3: Calculate costs for each investment
-        const costs = {};           // investmentId → { accountId → amount }
-        const allocationStatus = {}; // investmentId → boolean (could fully allocate?)
+        const costs = {};
+        const allocationStatus = {};
 
         investments.forEach(inv => {
-            const result = calculateInvestmentCost(inv, availableBalances, originalTotalTHB);
+            // Get the group-adjusted base amount
+            // For grouped investments: Total × Group1% × Group2% (cumulative)
+            const groupMultiplier = getGroupPercentageMultiplier(inv.groupId);
+            const adjustedBaseTHB = originalTotalTHB * groupMultiplier;
+
+            const result = calculateInvestmentCost(inv, availableBalances, adjustedBaseTHB);
             costs[inv.id] = result.costs;
             allocationStatus[inv.id] = result.couldFullyAllocate;
         });
 
         return { costs, allocationStatus };
-    }, [accounts, investments, exchangeRate]);
+    }, [accounts, investments, groups, exchangeRate]);
 
-    // Shorthand for accessing costs
     const calculatedCosts = calculatedData.costs;
 
-    // -------------------------------------------------------------------------
-    // INVESTMENT HELPERS
-    // -------------------------------------------------------------------------
-
-    /**
-     * Get total cost for an investment (sum of all account allocations)
-     */
     const getInvestmentTotalCost = (investmentId) => {
         const costs = calculatedCosts[investmentId] || {};
         return Object.values(costs).reduce((sum, cost) => sum + cost, 0);
     };
 
-    /**
-     * Get detailed cost breakdown for display
-     * Returns array of { accountId, accountName, currency, amount }
-     */
     const getInvestmentCostBreakdown = (investmentId) => {
         const costs = calculatedCosts[investmentId] || {};
         return Object.entries(costs).map(([accountId, amount]) => {
@@ -374,17 +891,12 @@ export const InvestmentProvider = ({ children }) => {
         });
     };
 
-    /**
-     * Calculate remaining balance per account after all investments
-     * Used to show how much is left in each account
-     */
     const remainingBalances = useMemo(() => {
         const remaining = {};
         accounts.forEach(acc => {
             remaining[acc.id] = acc.amount;
         });
 
-        // Subtract all investment allocations
         Object.values(calculatedCosts).forEach(costs => {
             Object.entries(costs).forEach(([accountId, amount]) => {
                 remaining[accountId] = (remaining[accountId] || 0) - amount;
@@ -394,54 +906,13 @@ export const InvestmentProvider = ({ children }) => {
         return remaining;
     }, [accounts, calculatedCosts]);
 
-    /**
-     * Validate if an investment can be covered by available funds
-     * Used when adding/editing investments
-     */
-    const validateInvestment = (investment, isUpdate = false) => {
-        const testBalances = {};
-        accounts.forEach(acc => {
-            testBalances[acc.id] = acc.amount;
-        });
-
-        // Deduct existing investments (except the one being updated)
-        investments.forEach(inv => {
-            if (isUpdate && inv.id === investment.id) return;
-            const costs = calculatedCosts[inv.id] || {};
-            Object.entries(costs).forEach(([accountId, amount]) => {
-                testBalances[accountId] = (testBalances[accountId] || 0) - amount;
-            });
-        });
-
-        const costs = calculateInvestmentCost(investment, { ...testBalances });
-        const totalNeeded = Object.values(costs).reduce((sum, c) => sum + c, 0);
-
-        return totalNeeded > 0;
-    };
-
-    /**
-     * Check if an investment is "overspent" (couldn't be fully allocated)
-     * Used to show red styling on the investment card
-     */
     const isInvestmentOverspent = (investmentId) => {
-        const couldAllocate = calculatedData.allocationStatus[investmentId];
-        return couldAllocate === false;
+        return calculatedData.allocationStatus[investmentId] === false;
     };
 
     // -------------------------------------------------------------------------
-    // DCA (DOLLAR COST AVERAGING) FUNCTIONS
+    // DCA FUNCTIONS
     // -------------------------------------------------------------------------
-
-    /**
-     * Generate DCA schedule based on investment settings
-     * 
-     * Two modes:
-     * 1. With end date: Shows all scheduled dates from start to end
-     * 2. Forever mode (no end): Shows completed dates + next uncompleted
-     * 
-     * @param {Object} investment - Investment with DCA settings
-     * @returns {Array<{ date: Date, completed: boolean }>}
-     */
     const generateDcaSchedule = (investment) => {
         if (!investment.dcaStartDate) return [];
 
@@ -450,7 +921,6 @@ export const InvestmentProvider = ({ children }) => {
         const schedule = [];
         let current = new Date(start);
 
-        // Determine interval based on DCA type
         const getInterval = () => {
             switch (investment.dcaType) {
                 case 'daily': return { days: 1 };
@@ -470,20 +940,14 @@ export const InvestmentProvider = ({ children }) => {
             }
         };
 
-        // Helper to advance date by interval
         const advanceDate = (date, interval) => {
             const newDate = new Date(date);
-            if (interval.days) {
-                newDate.setDate(newDate.getDate() + interval.days);
-            } else if (interval.months) {
-                newDate.setMonth(newDate.getMonth() + interval.months);
-            } else if (interval.years) {
-                newDate.setFullYear(newDate.getFullYear() + interval.years);
-            }
+            if (interval.days) newDate.setDate(newDate.getDate() + interval.days);
+            else if (interval.months) newDate.setMonth(newDate.getMonth() + interval.months);
+            else if (interval.years) newDate.setFullYear(newDate.getFullYear() + interval.years);
             return newDate;
         };
 
-        // Check if a date is marked as completed in history
         const isDateCompleted = (dateToCheck) => {
             return investment.dcaHistory?.some(h =>
                 new Date(h.date).toDateString() === dateToCheck.toDateString() && h.completed
@@ -491,34 +955,20 @@ export const InvestmentProvider = ({ children }) => {
         };
 
         const interval = getInterval();
-        const maxIterations = 500;  // Safety limit
+        const maxIterations = 500;
         let i = 0;
 
         if (end) {
-            // Mode 1: With end date - show all scheduled DCAs
             while (i < maxIterations && current <= end) {
-                schedule.push({
-                    date: new Date(current),
-                    completed: isDateCompleted(current)
-                });
+                schedule.push({ date: new Date(current), completed: isDateCompleted(current) });
                 current = advanceDate(current, interval);
                 i++;
             }
         } else {
-            // Mode 2: Forever - show completed + first uncompleted
             while (i < maxIterations) {
                 const completed = isDateCompleted(current);
-
-                schedule.push({
-                    date: new Date(current),
-                    completed: completed
-                });
-
-                // Stop after first uncompleted (this is the "next" one)
-                if (!completed) {
-                    break;
-                }
-
+                schedule.push({ date: new Date(current), completed });
+                if (!completed) break;
                 current = advanceDate(current, interval);
                 i++;
             }
@@ -527,10 +977,6 @@ export const InvestmentProvider = ({ children }) => {
         return schedule;
     };
 
-    /**
-     * Toggle DCA completion status for a specific date
-     * Updates the dcaHistory array on the investment
-     */
     const toggleDcaCompletion = (investmentId, date) => {
         setInvestments(prev => prev.map(inv => {
             if (inv.id !== investmentId) return inv;
@@ -542,21 +988,15 @@ export const InvestmentProvider = ({ children }) => {
             );
 
             if (existing >= 0) {
-                // Toggle existing entry
                 const updated = [...history];
                 updated[existing] = { ...updated[existing], completed: !updated[existing].completed };
                 return { ...inv, dcaHistory: updated };
             } else {
-                // Add new completed entry
                 return { ...inv, dcaHistory: [...history, { date: dateStr, completed: true }] };
             }
         }));
     };
 
-    /**
-     * Get DCA completion statistics
-     * Returns { completed: number, total: number }
-     */
     const getDcaCompletionCount = (investmentId) => {
         const inv = investments.find(i => i.id === investmentId);
         if (!inv) return { completed: 0, total: 0 };
@@ -569,55 +1009,28 @@ export const InvestmentProvider = ({ children }) => {
     // -------------------------------------------------------------------------
     // CRUD OPERATIONS
     // -------------------------------------------------------------------------
-
-    /**
-     * Add a new account
-     * ID is auto-generated using timestamp
-     */
     const addAccount = (account) => {
         setAccounts(prev => [...prev, { ...account, id: Date.now() }]);
     };
 
-    /**
-     * Remove an account by ID
-     */
     const removeAccount = (id) => {
         setAccounts(prev => prev.filter(acc => acc.id !== id));
     };
 
-    /**
-     * Update an existing account
-     * Merges updates with existing account data
-     */
     const updateAccount = (id, updates) => {
         setAccounts(prev => prev.map(acc =>
             acc.id === id ? { ...acc, ...updates } : acc
         ));
     };
 
-    /**
-     * Add a new investment
-     * ID is auto-generated, dcaHistory initialized empty
-     */
     const addInvestment = (investment) => {
-        setInvestments(prev => [...prev, {
-            ...investment,
-            id: Date.now(),
-            dcaHistory: []
-        }]);
+        setInvestments(prev => [...prev, { ...investment, id: Date.now(), dcaHistory: [] }]);
     };
 
-    /**
-     * Remove an investment by ID
-     */
     const removeInvestment = (id) => {
         setInvestments(prev => prev.filter(inv => inv.id !== id));
     };
 
-    /**
-     * Update an existing investment
-     * Merges updates with existing investment data
-     */
     const updateInvestment = (id, updates) => {
         setInvestments(prev => prev.map(inv =>
             inv.id === id ? { ...inv, ...updates } : inv
@@ -627,35 +1040,68 @@ export const InvestmentProvider = ({ children }) => {
     // -------------------------------------------------------------------------
     // CONTEXT VALUE
     // -------------------------------------------------------------------------
-
     const value = {
-        // State
+        // Plans management
+        plans,
+        currentPlanId,
+        createPlan,
+        renamePlan,
+        deletePlan,
+        reorderPlans,
+        reorderGroups,
+        reorderInvestments,
+        reorderAccounts,
+        switchPlan,
+        exportPlanCSV,
+        exportPlanTXT,
+        importPlan,
+
+        // Sidebar
+        sidebarOpen,
+        toggleSidebar,
+
+        // Current plan data
         exchangeRate,
         setExchangeRate,
         accounts,
         investments,
+        groups,
 
-        // CRUD operations
+        // Account CRUD
         addAccount,
         removeAccount,
         updateAccount,
+
+        // Investment CRUD
         addInvestment,
         removeInvestment,
         updateInvestment,
 
-        // Sync states
-        isLoading,      // True while loading from Firestore
-        isSyncing,      // True while saving to Firestore
-        lastSyncTime,   // Last successful sync timestamp
+        // Group CRUD
+        addGroup,
+        updateGroup,
+        removeGroup,
+        moveInvestmentToGroup,
 
-        // Calculation functions
+        // Group getters
+        getGroupFundAmount,
+        getRootGroups,
+        getChildGroups,
+        getGroupInvestments,
+        getUngroupedInvestments,
+
+        // Sync states
+        isLoading,
+        isSyncing,
+        lastSyncTime,
+
+        // Calculations
         getInvestmentTotalCost,
         getInvestmentCostBreakdown,
         remainingBalances,
-        validateInvestment,
         isInvestmentOverspent,
 
-        // DCA functions
+        // DCA
         generateDcaSchedule,
         toggleDcaCompletion,
         getDcaCompletionCount

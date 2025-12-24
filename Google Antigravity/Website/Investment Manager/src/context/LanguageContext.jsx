@@ -1,11 +1,12 @@
 /**
- * LanguageContext.jsx - Internationalization (i18n) System
+ * LanguageContext.jsx - Internationalization (i18n) System with Firestore Sync
  * 
  * Provides language switching between English and Thai.
  * Translations are defined in translations.js and accessed via the `t` object.
  * 
  * Features:
- * - Persists language preference to localStorage
+ * - Syncs language preference to Firestore when logged in
+ * - Falls back to localStorage for guests
  * - Sets data-language attribute on <html> for font targeting
  * - Automatically switches font (Inter for EN, Kanit for TH)
  * 
@@ -18,7 +19,10 @@
  *   2. Use via t.yourNewKey in any component
  */
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from './AuthContext';
 import { translations } from '../translations';
 
 // Create the context
@@ -43,15 +47,59 @@ export const useLanguage = () => {
  * Wrap your app with this to enable i18n functionality
  */
 export const LanguageProvider = ({ children }) => {
+    const { user } = useAuth();
+
     // Initialize language from localStorage, default to English
     const [language, setLanguage] = useState(() => {
         const saved = localStorage.getItem('investman-language');
         return saved || 'en';
     });
 
+    // Track if we've loaded from Firestore
+    const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
+
+    // Load language from Firestore when user logs in
+    useEffect(() => {
+        const loadLanguageFromFirestore = async () => {
+            if (!user) {
+                setHasLoadedFromFirestore(false);
+                return;
+            }
+
+            try {
+                const prefsRef = doc(db, 'users', user.uid, 'preferences', 'settings');
+                const prefsDoc = await getDoc(prefsRef);
+
+                if (prefsDoc.exists() && prefsDoc.data().language !== undefined) {
+                    const firestoreLanguage = prefsDoc.data().language;
+                    setLanguage(firestoreLanguage);
+                    localStorage.setItem('investman-language', firestoreLanguage);
+                }
+                setHasLoadedFromFirestore(true);
+            } catch (error) {
+                console.error('Error loading language from Firestore:', error);
+                setHasLoadedFromFirestore(true);
+            }
+        };
+
+        loadLanguageFromFirestore();
+    }, [user]);
+
+    // Save language to Firestore when it changes (and user is logged in)
+    const saveLanguageToFirestore = useCallback(async (lang) => {
+        if (!user || !hasLoadedFromFirestore) return;
+
+        try {
+            const prefsRef = doc(db, 'users', user.uid, 'preferences', 'settings');
+            await setDoc(prefsRef, { language: lang }, { merge: true });
+        } catch (error) {
+            console.error('Error saving language to Firestore:', error);
+        }
+    }, [user, hasLoadedFromFirestore]);
+
     // Effect: Persist language and apply font changes
     useEffect(() => {
-        // Save to localStorage for next visit
+        // Save to localStorage for next visit (always)
         localStorage.setItem('investman-language', language);
 
         // Set data-language attribute on <html> for CSS targeting
@@ -61,7 +109,10 @@ export const LanguageProvider = ({ children }) => {
         document.documentElement.style.fontFamily = language === 'th'
             ? "'Kanit', 'Inter', sans-serif"  // Thai: Kanit (with Inter fallback)
             : "'Inter', sans-serif";           // English: Inter
-    }, [language]);
+
+        // Save to Firestore if user is logged in
+        saveLanguageToFirestore(language);
+    }, [language, saveLanguageToFirestore]);
 
     // Toggle between English and Thai
     const toggleLanguage = () => {

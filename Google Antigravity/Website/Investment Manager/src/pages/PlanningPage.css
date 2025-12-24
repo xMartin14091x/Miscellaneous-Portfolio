@@ -105,6 +105,7 @@
 /* Closed sidebar state */
 .planning-sidebar.closed {
     transform: translateX(-100%);
+    overflow: visible;
 }
 
 /* --- Sidebar Header --- */
@@ -125,33 +126,41 @@
     white-space: nowrap;
 }
 
-/* --- Sidebar Toggle Button --- */
-.sidebar-toggle {
+/* --- Sidebar Toggle Button (Independent, Always Visible) --- */
+.sidebar-toggle-btn {
+    position: fixed;
+    left: 260px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: var(--button-bg);
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-
-.sidebar-toggle svg {
-    width: 18px;
-    height: 18px;
-    color: var(--text-secondary);
-}
-
-.sidebar-toggle:hover {
     background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    transition: left 0.3s ease, background 0.2s ease;
+    z-index: 200;
+    font-size: 1.2rem;
+    font-weight: bold;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
 }
 
-.sidebar-toggle:hover svg {
-    color: white;
+.sidebar-toggle-btn:hover {
+    background: var(--primary-color-light, #16a34a);
+}
+
+/* When sidebar is open, position at sidebar edge */
+.sidebar-toggle-btn.open {
+    left: 260px;
+}
+
+/* When sidebar is closed, position at screen edge */
+.sidebar-toggle-btn.closed {
+    left: 0;
 }
 
 /* --- Sidebar Content --- */
@@ -391,7 +400,7 @@
    ============================================ */
 
 .section {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
 }
 
 .section-label {
@@ -429,8 +438,7 @@
 }
 
 .card:hover {
-    border-color: var(--primary-color);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 20px var(--card-glow-color, rgba(34, 197, 94, 0.25)), 0 0 15px var(--card-glow-color-subtle, rgba(34, 197, 94, 0.15));
 }
 
 /* --- Account Card --- */
@@ -464,16 +472,28 @@
    ============================================ */
 
 .investment-card {
-    padding: 1rem 1rem 0.75rem;
+    padding: 1rem;
+    animation: cardSlideIn 0.3s ease;
 }
 
-/* --- Investment Header --- */
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Investment Header (Row 1) --- */
 .investment-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
 }
 
 .investment-name {
@@ -483,53 +503,346 @@
     flex: 1;
 }
 
-/* --- Percentage --- */
+/* --- Percentage (Bold Green, like Account Amount) --- */
 .investment-percentage {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 800;
     color: var(--primary-color);
     line-height: 1;
 }
 
-/* --- Cost Display --- */
-.investment-cost {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-color);
-    margin: 0.25rem 0;
+/* --- Row 2: Cost --- */
+.investment-cost-row {
+    padding: 0.2rem 0;
 }
 
-/* --- DCA Info Row --- */
-.investment-dca {
+.investment-cost {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.investment-cost.overspent-text {
+    color: #ef4444;
+}
+
+/* --- Row 3: DCA Type + Timeframe --- */
+.investment-dca-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-    border-top: 1px solid var(--border-color);
-    margin-top: 0.5rem;
+    gap: 0.75rem;
+    padding: 0.35rem 0 0;
     cursor: pointer;
 }
 
-.dca-timeframe {
+/* DCA Type Badge - Faint green with curved outline */
+.dca-type-badge {
     font-size: 0.8rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.3rem 0.6rem;
     background: var(--primary-glow);
     color: var(--primary-color);
-    border-radius: 4px;
+    border: 1px solid var(--primary-color);
+    border-radius: 15px;
     font-weight: 500;
 }
 
-.dca-count {
+/* DCA Count Display */
+.dca-count-display {
     font-size: 0.8rem;
     color: var(--text-secondary);
     font-weight: 600;
 }
 
-.dca-per-amount {
+/* DCA Info Group */
+.dca-info-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.dca-per-cost {
     font-size: 0.75rem;
     color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* ============================================
+   INVESTMENT GROUPS
+   ============================================ */
+
+.investment-group {
+    margin-bottom: 1rem;
+    border-left: none;
+    /* Remove static border, use pseudo-element */
+    border-radius: 8px;
+    overflow: visible;
+    position: relative;
+}
+
+/* Animated left border - slides from top to bottom */
+.investment-group::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--group-border-color, var(--primary-color));
+    border-radius: 3px 0 0 3px;
+    transform-origin: top;
+    transform: scaleY(1);
+}
+
+/* Animate border when expanded */
+.investment-group.expanded::before {
+    animation: borderSlideDown 0.5s ease forwards;
+}
+
+/* No border visible when collapsed header only */
+.investment-group.collapsed::before {
+    transform: scaleY(1);
+    /* Keep border visible even when collapsed */
+}
+
+@keyframes borderSlideDown {
+    from {
+        transform: scaleY(0);
+    }
+
+    to {
+        transform: scaleY(1);
+    }
+}
+
+.group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.group-header:hover {
+    filter: brightness(1.05);
+}
+
+.group-expand-icon {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    width: 1rem;
+}
+
+.group-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.group-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-color);
+    flex: 1;
+}
+
+.group-percentage {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.group-fund {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
     font-weight: 500;
-    margin-left: auto;
+}
+
+.group-fund-usd {
+    margin-left: 0.5rem;
+    color: var(--text-muted, #888);
+    font-size: 0.75rem;
+}
+
+.group-header .menu-btn {
+    opacity: 1;
+}
+
+/* Group header dropdown positioning */
+.group-header .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0.5rem;
+    margin-top: 0.25rem;
+    z-index: 9999;
+}
+
+.group-content {
+    padding: 0.75rem 1rem 1rem;
+    background: var(--bg-color);
+    overflow: visible;
+    animation: slideDown 0.3s ease-out;
+    transform-origin: top;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        transform: scaleY(0.8);
+    }
+
+    to {
+        opacity: 1;
+        max-height: 2000px;
+        transform: scaleY(1);
+    }
+}
+
+.group-content .cards-grid {
+    margin-bottom: 0.75rem;
+}
+
+/* Ungrouped section */
+.ungrouped-section {
+    margin-top: 1rem;
+}
+
+.ungrouped-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.ungrouped-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-style: italic;
+}
+
+/* Dropdown submenu for move to group */
+.dropdown-submenu {
+    border-top: 1px solid var(--border-color);
+    margin-top: 0.25rem;
+    padding-top: 0.25rem;
+}
+
+.dropdown-submenu .submenu-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    padding: 0.25rem 0.75rem;
+    display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dropdown-submenu button {
+    font-size: 0.8rem;
+}
+
+.group-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.5rem;
+}
+
+/* ============================================
+   DRAG REORDER STYLES
+   ============================================ */
+
+.dragging {
+    opacity: 0.5;
+    transform: scale(0.98);
+    cursor: grabbing !important;
+}
+
+.drag-over {
+    border-top: 2px solid var(--primary-color);
+}
+
+.drag-handle {
+    cursor: grab;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* ============================================
+   DCA SCHEDULE PANEL (EXPANDED)
+   ============================================ */
+
+.dca-schedule-panel {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.dca-dates-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.dca-date-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dca-date-item:hover {
+    background: var(--dca-accent-light, var(--primary-glow));
+}
+
+.dca-date-item.completed {
+    background: var(--dca-accent-light, var(--primary-glow));
+    border-color: var(--dca-accent-color, var(--primary-color));
+}
+
+.dca-date-item.completed .dca-date {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+}
+
+/* Actual checkbox styling */
+.dca-checkbox {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--border-color);
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: white;
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+.dca-date-item.completed .dca-checkbox {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.dca-date {
+    font-weight: 500;
 }
 
 /* ============================================
@@ -627,14 +940,8 @@
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    opacity: 0;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease;
     flex-shrink: 0;
-}
-
-.card:hover .menu-btn,
-.menu-btn.visible {
-    opacity: 1;
 }
 
 .menu-btn svg {
@@ -657,22 +964,53 @@
 /* Investment card menu - inline with header */
 .investment-header .menu-btn {
     position: relative;
-    top: auto;
-    right: auto;
 }
 
 /* --- Dropdown Menu --- */
 .dropdown-menu {
     position: absolute;
-    top: 2.5rem;
-    right: 0.5rem;
+    top: 100%;
+    right: 0;
+    margin-top: 0.25rem;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    z-index: 100;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
     overflow: hidden;
-    min-width: 120px;
+    min-width: 140px;
+    animation: slideDown 0.5s ease;
+    transform-origin: top right;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Slide out animation for closing */
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.95);
+    }
+}
+
+.dropdown-menu.closing,
+.plan-dropdown.closing {
+    animation: slideUp 0.3s ease forwards;
 }
 
 .dropdown-menu button {
@@ -806,6 +1144,34 @@
     max-width: 500px;
 }
 
+/* PC: Increase modal and reduce form padding */
+@media (min-width: 768px) {
+    .modal {
+        max-height: 95vh;
+        max-width: 420px;
+        padding: 1.5rem;
+    }
+
+    .modal h3 {
+        margin-bottom: 1rem;
+    }
+
+    .form-group {
+        margin-bottom: 0.75rem;
+    }
+
+    .form-group label {
+        margin-bottom: 0.3rem;
+        font-size: 0.8rem;
+    }
+
+    .form-group input,
+    .form-group select {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
+}
+
 @keyframes slideUp {
     from {
         opacity: 0;
@@ -884,6 +1250,241 @@
 }
 
 /* ============================================
+   COLOR PICKER
+   ============================================ */
+
+.color-picker-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.color-preview {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+/* Visual Color Picker */
+.color-picker-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.color-gradient {
+    width: 100%;
+    height: 120px;
+    border-radius: 8px;
+    position: relative;
+    cursor: crosshair;
+    user-select: none;
+}
+
+.color-gradient-white {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: linear-gradient(to right, white, transparent);
+}
+
+.color-gradient-black {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: linear-gradient(to bottom, transparent, black);
+}
+
+.hue-bar {
+    width: 100%;
+    height: 16px;
+    border-radius: 8px;
+    background: linear-gradient(to right,
+            hsl(0, 100%, 50%),
+            hsl(60, 100%, 50%),
+            hsl(120, 100%, 50%),
+            hsl(180, 100%, 50%),
+            hsl(240, 100%, 50%),
+            hsl(300, 100%, 50%),
+            hsl(360, 100%, 50%));
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+}
+
+.hue-indicator {
+    position: absolute;
+    top: -2px;
+    width: 8px;
+    height: 20px;
+    background: white;
+    border: 2px solid #333;
+    border-radius: 3px;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.color-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.color-preview-large {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+/* Editable RGB inputs */
+.rgb-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.rgb-label {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.rgb-value {
+    color: var(--primary-color);
+    font-weight: 700;
+    padding: 0.15rem 0.3rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 28px;
+    text-align: center;
+}
+
+.rgb-value:hover {
+    background: var(--primary-glow);
+}
+
+.rgb-input {
+    width: 45px;
+    padding: 0.2rem 0.3rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+    font-weight: 700;
+    color: var(--primary-color);
+    background: var(--bg-color);
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+.rgb-input::-webkit-outer-spin-button,
+.rgb-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Color Palettes */
+.color-palettes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.palette-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.palette-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    min-width: 45px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.palette-swatches {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.palette-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.palette-swatch:hover {
+    transform: scale(1.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 1;
+}
+
+/* Wider gradient swatches */
+.gradient-swatch {
+    width: 36px;
+}
+
+/* Compact color picker for PC - reduce heights */
+@media (min-width: 768px) {
+    .color-gradient {
+        height: 80px;
+    }
+
+    .color-palettes {
+        gap: 0.35rem;
+    }
+
+    .palette-swatches {
+        gap: 3px;
+    }
+
+    .palette-swatch {
+        width: 18px;
+        height: 18px;
+    }
+
+    .gradient-swatch {
+        width: 32px;
+    }
+}
+
+.percentage-slider {
+    width: 100%;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 4px;
+    background: linear-gradient(to right, var(--primary-glow), var(--primary-color));
+    cursor: pointer;
+}
+
+.percentage-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+/* ============================================
    DCA OPTIONS
    ============================================ */
 
@@ -898,7 +1499,7 @@
     font-size: 0.85rem;
     font-weight: 500;
     background: var(--bg-color);
-    color: var(--text-secondary);
+    color: var(--text-color);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: pointer;
@@ -966,7 +1567,7 @@
     gap: 0.5rem;
 }
 
-.priority-btn {
+.priority-item {
     display: flex;
     align-items: center;
     gap: 0.625rem;
@@ -977,39 +1578,45 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
+    width: 100%;
+    text-align: left;
+    color: var(--text-color);
 }
 
-.priority-btn:hover {
+.priority-item:hover {
     border-color: var(--primary-color);
+    background: var(--primary-glow);
 }
 
-.priority-btn.selected {
+.priority-item.selected {
     background: var(--primary-glow);
     border-color: var(--primary-color);
 }
 
-.priority-order {
-    min-width: 50px;
-    padding: 0.2rem 0.4rem;
-    background: var(--card-bg);
+.priority-badge {
+    min-width: 55px;
+    padding: 0.25rem 0.5rem;
+    background: var(--primary-color);
     border-radius: 4px;
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--primary-color);
+    color: white;
     text-align: center;
 }
 
-.priority-name {
-    flex: 1;
-    text-align: left;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--text-color);
+.priority-item:not(.selected) .priority-badge {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px dashed var(--border-color);
 }
 
 .priority-currency {
+    margin-left: auto;
     font-size: 0.8rem;
     color: var(--text-secondary);
+    padding: 0.2rem 0.5rem;
+    background: var(--card-bg);
+    border-radius: 4px;
 }
 
 /* ============================================
@@ -1068,14 +1675,19 @@
         padding-top: 60px;
     }
 
+    /* Mobile: sidebar starts closed and is an overlay */
     .planning-sidebar {
         top: 60px;
         width: 260px;
-        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .planning-sidebar.closed {
+        transform: translateX(-100%);
     }
 
     .planning-main {
-        margin-left: 0;
+        margin-left: 0 !important;
         padding: 1rem;
     }
 
@@ -1085,7 +1697,7 @@
 
     .exchange-rate-wrapper {
         position: fixed;
-        top: 75px;
+        top: 70px;
         right: 1rem;
     }
 
@@ -1119,11 +1731,25 @@
     .form-row .form-group.small {
         flex: 1;
     }
+
+    /* Mobile toggle button positioning */
+    .sidebar-toggle-btn.open {
+        left: 260px;
+    }
+
+    .sidebar-toggle-btn.closed {
+        left: 0;
+    }
 }
 
 @media (max-width: 480px) {
     .planning-sidebar {
-        width: 100%;
+        width: 85%;
+    }
+
+    /* Toggle position for 85% width sidebar */
+    .sidebar-toggle-btn.open {
+        left: calc(85vw);
     }
 
     .dca-options {
@@ -1133,5 +1759,402 @@
     .dca-option {
         padding: 0.4rem 0.6rem;
         font-size: 0.8rem;
+    }
+}
+
+/* ============================================
+   SIDEBAR TOGGLE - CENTERED ON EDGE
+   ============================================ */
+
+.planning-sidebar .sidebar-toggle {
+    position: absolute;
+    right: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 48px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    z-index: 101;
+}
+
+.planning-sidebar .sidebar-toggle:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* When sidebar is closed, toggle stays visible on screen edge */
+.planning-sidebar.closed .sidebar-toggle {
+    position: fixed;
+    left: 0;
+    right: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    border-radius: 0 8px 8px 0;
+    border-left: none;
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+/* --- Sidebar Title --- */
+.sidebar-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0 0 1rem 0;
+    padding: 0 0.5rem;
+}
+
+/* --- Sidebar Content in New Structure --- */
+.planning-sidebar .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1.5rem 1rem;
+}
+
+.planning-sidebar .plans-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* --- Plan Item Styles --- */
+.plan-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-color);
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.plan-item:hover {
+    background: var(--primary-glow);
+}
+
+.plan-item.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.plan-item.active .plan-name,
+.plan-item.active .plan-icon {
+    color: white;
+}
+
+.plan-icon {
+    flex-shrink: 0;
+}
+
+.plan-name {
+    flex: 1;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.plan-menu-btn {
+    background: none;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.plan-item:hover .plan-menu-btn {
+    opacity: 1;
+}
+
+.plan-item.active .plan-menu-btn {
+    color: rgba(255, 255, 255, 0.8);
+    opacity: 1;
+}
+
+.plan-rename-input {
+    flex: 1;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.9rem;
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    background: var(--bg-color);
+    color: var(--text-color);
+}
+
+/* --- Plan Dropdown Menu --- */
+.plan-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 150px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 200;
+    overflow: hidden;
+    animation: slideDown 0.5s ease;
+    transform-origin: top right;
+}
+
+.plan-dropdown button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    font-size: 0.875rem;
+    color: var(--text-color);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s ease;
+}
+
+.plan-dropdown button:hover {
+    background: var(--primary-glow);
+}
+
+.plan-dropdown button.delete-option {
+    color: #ef4444;
+}
+
+.plan-dropdown button.delete-option:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* --- Add Plan Button --- */
+.add-plan-wrapper {
+    position: relative;
+    margin-top: auto;
+    padding-top: 1rem;
+}
+
+.add-plan-btn {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--primary-glow);
+    border: 1px dashed var(--primary-color);
+    border-radius: 8px;
+    color: var(--primary-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.add-plan-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-style: solid;
+}
+
+.add-plan-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    margin-bottom: 0.5rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    animation: fadeSlideUp 0.5s ease-out;
+}
+
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0.5;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.add-plan-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    font-size: 0.875rem;
+    color: var(--text-color);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s ease;
+}
+
+.add-plan-menu button:hover {
+    background: var(--primary-glow);
+}
+
+/* ============================================
+   FAB BUTTON (FLOATING ACTION BUTTON)
+   ============================================ */
+
+.fab-container {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 150;
+}
+
+.fab-button {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: none;
+    color: white;
+    font-size: 1.75rem;
+    font-weight: 300;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.fab-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 24px rgba(34, 197, 94, 0.5);
+}
+
+.fab-container.open .fab-button {
+    background: var(--text-secondary);
+    transform: rotate(45deg);
+}
+
+.fab-menu {
+    position: absolute;
+    bottom: 70px;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    animation: fadeInUp 0.2s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fab-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-width: 180px;
+    padding: 0.875rem 1.5rem;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 30px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-color);
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.25s ease;
+}
+
+.fab-menu-item:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 8px 32px rgba(34, 197, 94, 0.5), 0 0 20px rgba(34, 197, 94, 0.4);
+    transform: translateY(-2px);
+}
+
+.fab-menu-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-color);
+    box-shadow: none;
+}
+
+.fab-menu-item.disabled:hover {
+    background: var(--card-bg);
+    color: var(--text-color);
+    transform: none;
+    box-shadow: none;
+}
+
+/* --- No Plan Message --- */
+.no-plan-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50vh;
+    gap: 1.5rem;
+    color: var(--text-secondary);
+}
+
+.create-first-plan-btn {
+    padding: 0.75rem 2rem;
+    background: var(--primary-color);
+    border: none;
+    border-radius: 25px;
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.create-first-plan-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+}
+
+/* --- Mobile FAB Adjustments --- */
+@media (max-width: 768px) {
+    .fab-container {
+        bottom: 1.5rem;
+        right: 1.5rem;
+    }
+
+    .fab-button {
+        width: 52px;
+        height: 52px;
+        font-size: 1.5rem;
     }
 }

@@ -8,19 +8,19 @@
  * 
  * Provider Order (outermost to innermost):
  * - BrowserRouter: Enables routing throughout the app
- * - ThemeProvider: Dark/light mode (doesn't depend on anything)
- * - LanguageProvider: i18n translations (doesn't depend on anything)
- * - AuthProvider: Firebase authentication (needs to wrap InvestmentProvider)
+ * - AuthProvider: Firebase authentication (needed by Theme/Language for sync)
+ * - ThemeProvider: Dark/light mode (syncs to Firestore if logged in)
+ * - LanguageProvider: i18n translations (syncs to Firestore if logged in)
  * - InvestmentProvider: Investment data (needs auth to know which user's data to load)
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 // Context Providers - these wrap the app to provide global state
+import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { InvestmentProvider } from './context/InvestmentContext'
-import { AuthProvider } from './context/AuthContext'
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute'  // Auth guard for protected pages
@@ -39,12 +39,12 @@ function App() {
   return (
     // BrowserRouter enables client-side routing (no page refresh on navigation)
     <BrowserRouter>
-      {/* ThemeProvider: Manages dark/light mode across the app */}
-      <ThemeProvider>
-        {/* LanguageProvider: Provides translations (t object) to all components */}
-        <LanguageProvider>
-          {/* AuthProvider: Manages user authentication state */}
-          <AuthProvider>
+      {/* AuthProvider: Must be outermost so Theme/Language can sync to Firestore */}
+      <AuthProvider>
+        {/* ThemeProvider: Manages dark/light mode, syncs to user preferences */}
+        <ThemeProvider>
+          {/* LanguageProvider: Provides translations, syncs to user preferences */}
+          <LanguageProvider>
             {/* InvestmentProvider: Manages investment data, syncs with Firestore */}
             <InvestmentProvider>
               {/* Navbar appears on all pages */}
@@ -69,9 +69,9 @@ function App() {
                 />
               </Routes>
             </InvestmentProvider>
-          </AuthProvider>
-        </LanguageProvider>
-      </ThemeProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </BrowserRouter>
   )
 }
