@@ -17,6 +17,8 @@ InvestMan! helps investors:
 8. **Drag-and-drop** - Reorder plans, accounts, groups, and investments
 9. **Dynamic theming** - Investment cards and DCA elements adapt to group color
 10. **Smooth animations** - Slide-in/out dropdowns, card animations, and group border animations
+11. **Account breakdown** - Click ℹ icon to see which accounts money is borrowed from
+12. **Overspent detection** - Investments show red when group-level allocations exceed 100%
 
 ---
 

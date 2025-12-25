@@ -30,6 +30,22 @@ A comprehensive investment planning web application with Firebase authentication
 
 ## 📋 Changelog
 
+### v1.4.0 (December 25, 2024)
+**Bug Fixes:**
+- **Fixed Overspent Calculation** - Grouped investments now correctly show overspent when total percentages exceed 100% at any group level
+- **Fixed Grouped Investment Cost Display** - Each investment now calculates costs independently, showing proper account breakdown even when other investments exist
+- **Fixed Group Header Hover** - Tooltip no longer becomes transparent when hovering on group header (changed from CSS filter to background)
+
+**New Features:**
+- **Account Breakdown Info Tooltips** - Click ℹ icon next to investment cost to see which accounts money is borrowed from
+- **Group Account Breakdown** - Click ℹ icon next to group name to see aggregated account usage for all investments in that group (including nested groups)
+- **Click-to-Show Tooltips** - Info tooltips are click-activated instead of hover for better mobile support
+
+**Improvements:**
+- Info tooltips positioned directly under the icon with high z-index (9999) for visibility
+- Click outside to close any open info tooltip
+- Tooltip shows account name and exact amount per account
+
 ### v1.3.0 (December 24, 2024)
 **New Features:**
 - **Gradient Color Support** - Groups can now use gradient colors from presets

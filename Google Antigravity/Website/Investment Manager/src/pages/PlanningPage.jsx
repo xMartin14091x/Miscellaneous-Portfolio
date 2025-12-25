@@ -70,6 +70,7 @@ const PlanningPage = () => {
     const [fabOpen, setFabOpen] = useState(false);
     const [addPlanMenuOpen, setAddPlanMenuOpen] = useState(false);
     const [closingMenu, setClosingMenu] = useState(null); // Track menu being closed for exit animation
+    const [openInfoTooltip, setOpenInfoTooltip] = useState(null); // Track which info tooltip is open (click to show)
     const [renamingPlanId, setRenamingPlanId] = useState(null);
     const [renamePlanValue, setRenamePlanValue] = useState('');
     const fileInputRef = useRef(null);
@@ -457,6 +458,55 @@ const PlanningPage = () => {
         }).join(' + ');
     };
 
+    // Get account source display for tooltip (shows which accounts money comes from)
+    const getAccountSourceDisplay = (investmentId) => {
+        const breakdown = getInvestmentCostBreakdown(investmentId);
+        if (breakdown.length === 0) return 'No accounts assigned';
+
+        return breakdown.map(b => {
+            const symbol = b.currency === 'THB' ? '฿' : '$';
+            return `${b.accountName}: ${symbol}${b.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }).join('\n');
+    };
+
+    // Get group account source display (aggregate breakdown for all investments in group)
+    const getGroupAccountSourceDisplay = (groupId) => {
+        // Get all investments in this group and nested groups
+        const getGroupInvestmentsRecursive = (gId) => {
+            const directInvestments = investments.filter(i => i.groupId === gId);
+            const childGroups = groups.filter(g => g.parentGroupId === gId);
+            let allInvestments = [...directInvestments];
+            childGroups.forEach(child => {
+                allInvestments = [...allInvestments, ...getGroupInvestmentsRecursive(child.id)];
+            });
+            return allInvestments;
+        };
+
+        const groupInvestments = getGroupInvestmentsRecursive(groupId);
+        if (groupInvestments.length === 0) return 'No investments in group';
+
+        // Aggregate costs per account
+        const accountTotals = {};
+        groupInvestments.forEach(inv => {
+            const breakdown = getInvestmentCostBreakdown(inv.id);
+            breakdown.forEach(b => {
+                const key = `${b.accountId}-${b.currency}`;
+                if (!accountTotals[key]) {
+                    accountTotals[key] = { accountName: b.accountName, currency: b.currency, amount: 0 };
+                }
+                accountTotals[key].amount += b.amount;
+            });
+        });
+
+        const entries = Object.values(accountTotals);
+        if (entries.length === 0) return 'No accounts assigned';
+
+        return entries.map(b => {
+            const symbol = b.currency === 'THB' ? '฿' : '$';
+            return `${b.accountName}: ${symbol}${b.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }).join('\n');
+    };
+
     // Get per-DCA amount display
     const getPerDcaDisplay = (investmentId) => {
         const dcaCount = getDcaCompletionCount(investmentId);
@@ -549,6 +599,23 @@ const PlanningPage = () => {
                     >
                         {getCostDisplay(investment.id)}
                     </span>
+                    <span
+                        className="cost-info-icon"
+                        onClick={(e) => { e.stopPropagation(); setOpenInfoTooltip(openInfoTooltip === `inv-${investment.id}` ? null : `inv-${investment.id}`); }}
+                        style={{ color: `rgba(${glowColor.r}, ${glowColor.g}, ${glowColor.b}, 0.6)` }}
+                    >
+                        ℹ
+                    </span>
+                    {openInfoTooltip === `inv-${investment.id}` && (
+                        <div className="info-tooltip-popup" onClick={(e) => e.stopPropagation()}>
+                            <div className="info-tooltip-header">Account Breakdown</div>
+                            <div className="info-tooltip-content">
+                                {getAccountSourceDisplay(investment.id).split('\n').map((line, i) => (
+                                    <div key={i}>{line}</div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Row 3: DCA Type + Timeframe + Per DCA Cost */}
@@ -665,6 +732,25 @@ const PlanningPage = () => {
                         style={indicatorStyle}
                     ></span>
                     <span className="group-name" style={{ color: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` }}>{group.name}</span>
+                    <span className="info-icon-wrapper">
+                        <span
+                            className="cost-info-icon group-info-icon"
+                            onClick={(e) => { e.stopPropagation(); setOpenInfoTooltip(openInfoTooltip === `grp-info-${group.id}` ? null : `grp-info-${group.id}`); }}
+                            style={{ color: `rgba(${groupColor.r}, ${groupColor.g}, ${groupColor.b}, 0.6)` }}
+                        >
+                            ℹ
+                        </span>
+                        {openInfoTooltip === `grp-info-${group.id}` && (
+                            <div className="info-tooltip-popup group-tooltip" onClick={(e) => e.stopPropagation()}>
+                                <div className="info-tooltip-header">Group Account Breakdown</div>
+                                <div className="info-tooltip-content">
+                                    {getGroupAccountSourceDisplay(group.id).split('\n').map((line, i) => (
+                                        <div key={i}>{line}</div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </span>
                     <span className="group-percentage" style={{ color: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` }}>{group.percentage}%</span>
                     <span className="group-fund" style={{ color: `rgb(${groupColor.r}, ${groupColor.g}, ${groupColor.b})` }}>
                         ฿{(Math.floor(fundAmount * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -792,7 +878,9 @@ const PlanningPage = () => {
                     !e.target.closest('.plan-menu-btn') &&
                     !e.target.closest('.fab-button') &&
                     !e.target.closest('.add-plan-btn') &&
-                    !e.target.closest('.add-plan-menu')) {
+                    !e.target.closest('.add-plan-menu') &&
+                    !e.target.closest('.info-tooltip-popup') &&
+                    !e.target.closest('.cost-info-icon')) {
                     // Trigger closing animation
                     if (activeMenu) {
                         setClosingMenu(activeMenu);
@@ -805,6 +893,7 @@ const PlanningPage = () => {
                     }
                     setFabOpen(false);
                     setAddPlanMenuOpen(false);
+                    setOpenInfoTooltip(null);
                 }
             }}
         >
