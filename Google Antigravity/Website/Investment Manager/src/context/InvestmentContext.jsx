@@ -857,15 +857,50 @@ export const InvestmentProvider = ({ children }) => {
         const costs = {};
         const allocationStatus = {};
 
+        // Helper: Calculate total percentage used at a specific group level
+        const getGroupLevelTotalPercentage = (parentGroupId) => {
+            // Sum percentages of direct children (investments + subgroups)
+            let totalPercentage = 0;
+
+            // Sum direct investment percentages
+            investments.forEach(inv => {
+                if (inv.groupId === parentGroupId) {
+                    totalPercentage += Number(inv.percentage) || 0;
+                }
+            });
+
+            // Sum direct subgroup percentages
+            groups.forEach(grp => {
+                if (grp.parentGroupId === parentGroupId) {
+                    totalPercentage += Number(grp.percentage) || 0;
+                }
+            });
+
+            return totalPercentage;
+        };
+
+        // Calculate overspent status for each investment based on group-level totals
         investments.forEach(inv => {
-            // Get the group-adjusted base amount
-            // For grouped investments: Total × Group1% × Group2% (cumulative)
+            const groupTotalPercentage = getGroupLevelTotalPercentage(inv.groupId);
+            // Investment is overspent if its group level exceeds 100%
+            allocationStatus[inv.id] = groupTotalPercentage <= 100;
+        });
+
+        // Calculate costs - each investment gets independent fresh balances
+        // This ensures all investments show proper breakdown (e.g., "฿500 + $20")
+        // regardless of processing order
+        investments.forEach(inv => {
             const groupMultiplier = getGroupPercentageMultiplier(inv.groupId);
             const adjustedBaseTHB = originalTotalTHB * groupMultiplier;
 
-            const result = calculateInvestmentCost(inv, availableBalances, adjustedBaseTHB);
+            // Fresh copy of balances for this investment's cost display
+            const investmentBalances = { ...availableBalances };
+            accounts.forEach(acc => {
+                investmentBalances[acc.id] = acc.amount;
+            });
+
+            const result = calculateInvestmentCost(inv, investmentBalances, adjustedBaseTHB);
             costs[inv.id] = result.costs;
-            allocationStatus[inv.id] = result.couldFullyAllocate;
         });
 
         return { costs, allocationStatus };

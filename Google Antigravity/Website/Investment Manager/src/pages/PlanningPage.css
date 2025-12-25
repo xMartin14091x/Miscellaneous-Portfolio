@@ -514,12 +514,96 @@
 /* --- Row 2: Cost --- */
 .investment-cost-row {
     padding: 0.2rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .investment-cost {
     font-size: 1rem;
     font-weight: 700;
     color: var(--primary-color);
+}
+
+.cost-info-icon {
+    font-size: 0.85rem;
+    cursor: help;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.cost-info-icon:hover {
+    opacity: 1;
+}
+
+.group-info-icon {
+    margin-left: 0.5rem;
+}
+
+/* Info tooltip popup */
+.investment-cost-row,
+.group-header {
+    position: relative;
+}
+
+/* Wrapper for info icon to position tooltip relative to icon */
+.info-icon-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.info-tooltip-popup {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    min-width: 180px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: fadeIn 0.15s ease-out;
+}
+
+/* Group tooltip needs higher z-index to appear above nested groups */
+.info-tooltip-popup.group-tooltip {
+    z-index: 9999;
+    margin-top: 0.25rem;
+    filter: none;
+    opacity: 1;
+}
+
+.info-tooltip-header {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-tooltip-content {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.info-tooltip-content>div {
+    padding: 0.15rem 0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .investment-cost.overspent-text {
@@ -625,7 +709,7 @@
 }
 
 .group-header:hover {
-    filter: brightness(1.05);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .group-expand-icon {
